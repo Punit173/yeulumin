@@ -197,31 +197,24 @@ export default function ThreeMannequin({
     const backTexture = new THREE.CanvasTexture(backCanvas);
     backTexture.colorSpace = THREE.SRGBColorSpace;
 
-    const redrawBackCanvas = (isLight: boolean) => {
-      if (!backCtx) return;
-      
-      const bgColor = isLight ? "#fafafa" : "#000000";
-      const strokeColor = isLight ? "#e4e4e7" : "#222222";
-      const textColor = isLight ? "#0a0a0a" : "#f5f5f5";
-      const subtextColor = isLight ? "#7B2FFF" : "#00FFB2";
-
-      backCtx.fillStyle = bgColor;
+    if (backCtx) {
+      backCtx.fillStyle = "#000000";
       backCtx.fillRect(0, 0, 512, 512);
 
       // Circular frame
-      backCtx.strokeStyle = strokeColor;
+      backCtx.strokeStyle = "#222222";
       backCtx.lineWidth = 4;
       backCtx.beginPath();
       backCtx.arc(256, 220, 100, 0, Math.PI * 2);
       backCtx.stroke();
 
       // Brand Wordmark and Info
-      backCtx.fillStyle = textColor;
+      backCtx.fillStyle = "#f5f5f5";
       backCtx.font = "bold 28px sans-serif";
       backCtx.textAlign = "center";
       backCtx.fillText("YEULUMIN AI", 256, 370);
 
-      backCtx.fillStyle = subtextColor;
+      backCtx.fillStyle = "#00FFB2";
       backCtx.font = "14px monospace";
       backCtx.fillText("NEURAL PROTOCOL LABS", 256, 410);
 
@@ -229,26 +222,13 @@ export default function ThreeMannequin({
       const logoImg = new Image();
       logoImg.src = "/logos/trimmed_yeulumin ai-05.png";
       logoImg.onload = () => {
-        const size = 120;
-        backCtx.drawImage(logoImg, 256 - size / 2, 220 - size / 2, size, size);
-        backTexture.needsUpdate = true;
+        if (backCtx) {
+          const size = 120;
+          backCtx.drawImage(logoImg, 256 - size / 2, 220 - size / 2, size, size);
+          backTexture.needsUpdate = true;
+        }
       };
-      backTexture.needsUpdate = true;
-    };
-
-    // Draw initial state
-    const initialIsLight = typeof document !== "undefined" && document.documentElement.classList.contains("light");
-    redrawBackCanvas(initialIsLight);
-
-    // Watch for class changes on root element (theme change)
-    const observer = new MutationObserver(() => {
-      const isLight = document.documentElement.classList.contains("light");
-      redrawBackCanvas(isLight);
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
+    }
     const backMat = new THREE.MeshStandardMaterial({
       color: tColor,
       map: backTexture,
@@ -405,7 +385,6 @@ export default function ThreeMannequin({
 
     // Cleanup
     return () => {
-      observer.disconnect();
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("resize", handleResize);
       
@@ -441,7 +420,7 @@ export default function ThreeMannequin({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-[480px] bg-[#111111]/45 light:bg-white border border-neutral-800/80 light:border-zinc-200 rounded-2xl overflow-hidden backdrop-blur-xl flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors duration-300"
+      className="relative w-full h-[480px] bg-[#111111]/45 border border-neutral-800/80 rounded-2xl overflow-hidden backdrop-blur-xl flex items-center justify-center cursor-grab active:cursor-grabbing"
     >
       {/* 3D Canvas */}
       <canvas ref={canvasRef} className="w-full h-full block" />
@@ -449,17 +428,17 @@ export default function ThreeMannequin({
       {/* Cybernetic overlay indicators */}
       <div className="absolute top-4 left-4 flex flex-col gap-1.5 pointer-events-none select-none">
         <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-neon light:bg-violet animate-pulse" />
-          <span className="text-[10px] font-display uppercase tracking-widest text-neutral-400 light:text-zinc-500">
+          <span className="h-2 w-2 rounded-full bg-neon animate-pulse" />
+          <span className="text-[10px] font-display uppercase tracking-widest text-neutral-400">
             Showroom Renderer v1.0
           </span>
         </div>
-        <div className="text-[9px] text-neutral-500 light:text-zinc-400 font-mono">
+        <div className="text-[9px] text-neutral-500 font-mono">
           Drag to rotate • Pinch to zoom
         </div>
       </div>
 
-      <div className="absolute top-4 right-4 text-[10px] font-mono bg-neutral-900/80 light:bg-zinc-100 border border-neutral-800 light:border-zinc-200 px-2 py-1 rounded text-neutral-400 light:text-zinc-700 pointer-events-none select-none">
+      <div className="absolute top-4 right-4 text-[10px] font-mono bg-neutral-900/80 border border-neutral-800 px-2 py-1 rounded text-neutral-400 pointer-events-none select-none">
         Active Base: <span style={{ color: shirtColor }}>{shirtColor.toUpperCase()}</span>
       </div>
 
