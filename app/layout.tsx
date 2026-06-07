@@ -17,7 +17,7 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
-  title: "YEULUMIN AI | Futuristic Custom Streetwear",
+  title: "Yeulumin AI | Futuristic Custom Streetwear",
   description: "Wear your imagination. Create bespoke AI-designed T-shirts, interact with custom clothing on a 3D showroom mannequin, and order streetwear shipped worldwide.",
   keywords: ["AI Custom T-Shirts", "Cyberpunk Apparel", "Three.js 3D Mannequin", "Futuristic Streetwear", "Yeulumin AI"],
   authors: [{ name: "Yeulumin AI Team" }],
