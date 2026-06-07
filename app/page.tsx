@@ -70,10 +70,19 @@ export default function Home() {
   const setColor = useViewerStore((state) => state.setColor);
   const setDesign = useViewerStore((state) => state.setDesign);
 
+  const [isMobile, setIsMobile] = useState(false);
+
   // Set default futuristic preview state for the home page hero configurator
   useEffect(() => {
     setColor("#1a1a1a");
-    setDesign("circuit");
+    setDesign("logo");
+
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [setColor, setDesign]);
   
   // Carousel Navigation
@@ -96,7 +105,7 @@ export default function Home() {
       <Navbar />
 
       {/* 1. HERO SECTION */}
-      <section className="relative w-full min-h-[calc(100vh-80px)] flex items-center justify-center py-12 md:py-20 overflow-hidden">
+      <section className="relative w-full min-h-[calc(100vh-80px)] overflow-hidden">
         {/* Dynamic Canvas Particles */}
         <ParticleCanvas />
 
@@ -104,48 +113,149 @@ export default function Home() {
         <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-neon/5 blur-[120px] pointer-events-none z-0" />
         <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 rounded-full bg-violet/5 blur-[150px] pointer-events-none z-0" />
 
-        <div className="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center z-10">
-          
-          {/* Hero Left Content */}
-          <div className="lg:col-span-7 flex flex-col items-start text-left gap-6 md:gap-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-neon/30 bg-neon/5 px-3 py-1 text-xs font-semibold text-neon glow-text-neon uppercase tracking-widest font-mono">
-              <Sparkles className="h-3 w-3" />
-              <span>Next-Gen Neural Print Lab</span>
+        {/* ─── MOBILE LAYOUT (< md) ─── */}
+        <div className="flex flex-col h-[calc(100vh-80px)] md:hidden relative">
+
+          {/* Full-screen immersive background */}
+          <div className="absolute inset-0">
+            {/* Radial gradient base */}
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_35%,rgba(0,255,178,0.06)_0%,rgba(123,47,255,0.04)_50%,transparent_80%)] pointer-events-none" />
+            
+            {/* Animated scan line */}
+            <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-neon/20 to-transparent animate-[float_4s_ease-in-out_infinite] pointer-events-none" style={{ top: '30%' }} />
+            <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-violet/15 to-transparent animate-[float_5s_ease-in-out_infinite_reverse] pointer-events-none" style={{ top: '65%' }} />
+
+            {/* Corner accent lines */}
+            <div className="absolute top-6 left-6 w-8 h-8 border-l border-t border-neon/20 pointer-events-none" />
+            <div className="absolute top-6 right-6 w-8 h-8 border-r border-t border-neon/20 pointer-events-none" />
+            <div className="absolute bottom-6 left-6 w-8 h-8 border-l border-b border-violet/20 pointer-events-none" />
+            <div className="absolute bottom-6 right-6 w-8 h-8 border-r border-b border-violet/20 pointer-events-none" />
+          </div>
+
+          {/* ── Center composition ── */}
+          <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
+
+            {/* Top micro-badge */}
+            <div className="mb-6">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-neon/30 bg-neon/5 px-3 py-1 text-[9px] font-bold text-neon uppercase tracking-[3px] font-mono">
+                <Sparkles className="h-2.5 w-2.5" />
+                <span>AI-Powered Fashion</span>
+              </div>
             </div>
 
-            <div className="flex flex-col">
-              <GlitchText text="WEAR YOUR" />
-              <span className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-none text-neon glow-text-neon -mt-2">
-                IMAGINATION
-              </span>
+            {/* Floating T-shirt with logo */}
+            <div className="relative mb-8">
+              {/* Outer orbital ring */}
+              <div className="absolute inset-0 m-auto w-52 h-52 rounded-full border border-neon/8 animate-[spin_20s_linear_infinite] pointer-events-none z-20">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-neon shadow-[0_0_8px_#00FFB2,0_0_16px_#00FFB2]" />
+              </div>
+              {/* Inner orbital ring (counter-rotate) */}
+              <div className="absolute inset-0 m-auto w-36 h-36 rounded-full border border-violet/10 animate-[spin_14s_linear_infinite_reverse] pointer-events-none z-20">
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 h-1 w-1 rounded-full bg-violet shadow-[0_0_6px_#7B2FFF]" />
+              </div>
+
+              {/* 3D T-shirt viewer */}
+              <div className="relative w-52 h-52 rounded-full overflow-hidden">
+                <div className="absolute inset-0 rounded-full bg-neon/10 blur-3xl scale-75 pointer-events-none z-0" />
+                <TshirtViewer scale={1.4} autoRotateSpeed={3} cameraDistance={3.4} />
+              </div>
             </div>
 
-            <p className="max-w-xl text-base sm:text-lg text-neutral-400 font-light leading-relaxed">
-              Design any T-shirt with AI in seconds. Interact with your customized clothing on a 3D showroom mannequin. We print in heavy-density ink and ship worldwide.
+            {/* Headline */}
+            <h1 className="font-display text-[2.5rem] font-black tracking-tight leading-[0.95] text-center text-white mb-3">
+              WEAR YOUR<br />
+              <span className="text-neon glow-text-neon">IMAGINATION</span>
+            </h1>
+
+            {/* Tagline */}
+            <p className="text-sm text-neutral-500 text-center max-w-[260px] leading-relaxed font-light">
+              Design custom streetwear with AI. Preview in 3D. Ship worldwide.
             </p>
+          </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
-              <Link
-                href="/customize"
-                className="group inline-flex items-center justify-center gap-2 rounded-lg bg-neon px-6 py-3.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#00e6a0] transition-all duration-300 glow-neon"
-              >
-                <span>Start Designing</span>
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-              <Link
-                href="/products"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-800 bg-[#111111]/40 hover:bg-[#111111]/80 hover:border-neutral-700 px-6 py-3.5 text-sm font-semibold text-neutral-300 transition-all duration-200"
-              >
-                <span>Browse Collection</span>
-              </Link>
+          {/* ── Bottom section: Stats + CTAs ── */}
+          <div className="relative z-10 px-5 pb-6 flex flex-col gap-3">
+
+            {/* Horizontal stat strip */}
+            <div className="flex items-center justify-between border-t border-neutral-800/60 pt-3 px-1">
+              {[
+                { value: "280GSM", label: "Cotton" },
+                { value: "AI", label: "Design" },
+                { value: "3D", label: "Preview" },
+                { value: "48HR", label: "Ship" },
+              ].map((stat, i) => (
+                <div key={stat.label} className="flex flex-col items-center gap-0.5">
+                  <span className="text-xs font-black text-neon font-mono tracking-wide">{stat.value}</span>
+                  <span className="text-[8px] text-neutral-600 uppercase tracking-wider font-mono">{stat.label}</span>
+                </div>
+              ))}
             </div>
-          </div>
 
-          {/* Hero Right Content: 3D Configurator */}
-          <div className="lg:col-span-5 w-full h-[550px] sm:h-[600px] rounded-2xl overflow-hidden border border-neutral-800/80 bg-[#111111]/45 backdrop-blur-xl z-10 shadow-[0_0_50px_rgba(0,255,178,0.15)] hover:border-neon/30 transition-all duration-500">
-            <TshirtViewer scale={1.5} autoRotateSpeed={2.5} cameraDistance={3.2} />
-          </div>
+            {/* Primary CTA */}
+            <Link
+              href="/customize"
+              className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl bg-neon py-4 text-sm font-black text-[#0A0A0A] uppercase tracking-widest glow-neon transition-all duration-200 active:scale-[0.97]"
+            >
+              <Sparkles className="h-4 w-4 fill-current" />
+              <span>Start Designing</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
 
+            {/* Secondary CTA */}
+            <Link
+              href="/products"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-neutral-800 bg-[#111111]/50 py-3.5 text-xs font-semibold text-neutral-400 uppercase tracking-widest transition-all duration-200 active:scale-[0.97]"
+            >
+              <span>Browse Collection</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* ─── DESKTOP LAYOUT (≥ md) ─── */}
+        <div className="hidden md:flex items-center justify-center min-h-[calc(100vh-80px)] py-12 md:py-20">
+          <div className="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 grid lg:grid-cols-12 gap-12 items-center z-10">
+
+            {/* Hero Left Content */}
+            <div className="lg:col-span-7 flex flex-col items-start text-left gap-6 md:gap-8">
+              <div className="inline-flex items-center gap-2 rounded-full border border-neon/30 bg-neon/5 px-3 py-1 text-xs font-semibold text-neon glow-text-neon uppercase tracking-widest font-mono">
+                <Sparkles className="h-3 w-3" />
+                <span>Next-Gen Neural Print Lab</span>
+              </div>
+
+              <div className="flex flex-col">
+                <GlitchText text="WEAR YOUR" />
+                <span className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-none text-neon glow-text-neon -mt-2">
+                  IMAGINATION
+                </span>
+              </div>
+
+              <p className="max-w-xl text-base sm:text-lg text-neutral-400 font-light leading-relaxed">
+                Design any T-shirt with AI in seconds. Interact with your customized clothing on a 3D showroom mannequin. We print in heavy-density ink and ship worldwide.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-start gap-4 w-full sm:w-auto">
+                <Link
+                  href="/customize"
+                  className="group inline-flex items-center justify-center gap-2 rounded-lg bg-neon px-6 py-3.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#00e6a0] transition-all duration-300 glow-neon"
+                >
+                  <span>Start Designing</span>
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </Link>
+                <Link
+                  href="/products"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-800 bg-[#111111]/40 hover:bg-[#111111]/80 hover:border-neutral-700 px-6 py-3.5 text-sm font-semibold text-neutral-300 transition-all duration-200"
+                >
+                  <span>Browse Collection</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Hero Right Content: 3D Configurator */}
+            <div className="lg:col-span-5 w-full h-[500px] lg:h-[620px] rounded-2xl overflow-hidden border border-neutral-800/80 bg-[#111111]/45 backdrop-blur-xl z-10 shadow-[0_0_50px_rgba(0,255,178,0.15)] hover:border-neon/30 transition-all duration-500">
+              <TshirtViewer scale={1.5} autoRotateSpeed={2.5} cameraDistance={3.2} />
+            </div>
+
+          </div>
         </div>
       </section>
 

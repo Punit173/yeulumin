@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF, Decal, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,7 +11,7 @@ useGLTF.preload("/models/tshirt.glb");
 
 // Helper function to generate design textures on a 512x512 canvas
 function generateDesignTexture(designId: string): THREE.CanvasTexture | null {
-  if (designId === "none") return null;
+  if (designId === "none" || designId === "logo") return null;
 
   const canvas = document.createElement("canvas");
   canvas.width = 512;
@@ -22,17 +22,7 @@ function generateDesignTexture(designId: string): THREE.CanvasTexture | null {
   // Clear canvas
   ctx.clearRect(0, 0, 512, 512);
 
-  if (designId === "logo") {
-    ctx.fillStyle = "#00FFB2";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "bold 80px sans-serif";
-    ctx.fillText("Y·AI", 256, 200);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "bold 22px sans-serif";
-    ctx.fillText("YEULUMIN AI", 256, 270);
-  } else if (designId === "stripe") {
+  if (designId === "stripe") {
     ctx.fillStyle = "rgba(255, 255, 255, 0.12)";
     for (let i = 0; i < 10; i++) {
       if (i % 2 === 0) {
@@ -160,7 +150,7 @@ export default function TshirtModel({
     }
   }, [color, shirtMeshNode]);
 
-  // Generate decal canvas texture
+  // Generate decal canvas texture (for non-logo designs)
   const [canvasTexture, setCanvasTexture] = useState<THREE.CanvasTexture | null>(null);
 
   useEffect(() => {
@@ -171,6 +161,24 @@ export default function TshirtModel({
       if (newTex) {
         newTex.dispose();
       }
+    };
+  }, [design]);
+
+  // Load real logo image texture for the 'logo' design
+  const [logoTexture, setLogoTexture] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    if (design !== "logo") {
+      setLogoTexture(null);
+      return;
+    }
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load("/logos/trimmed_yeulumin ai-05.png", (loaded) => {
+      loaded.needsUpdate = true;
+      setLogoTexture(loaded);
+    });
+    return () => {
+      tex.dispose();
     };
   }, [design]);
 
@@ -277,6 +285,16 @@ export default function TshirtModel({
               rotation={[0, 0, 0]}
               scale={[0.4, 0.4, 0.4]}
               map={canvasTexture}
+              polygonOffsetFactor={-1}
+            />
+          )}
+          {logoTexture && (
+            <Decal
+              mesh={meshRef as any}
+              position={[0, 0.05, 0.12]}
+              rotation={[0, 0, 0]}
+              scale={[0.3, 0.3, 0.3]}
+              map={logoTexture}
               polygonOffsetFactor={-1}
             />
           )}

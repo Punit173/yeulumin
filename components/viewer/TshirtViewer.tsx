@@ -30,7 +30,7 @@ export default function TshirtViewer({
   cameraDistance = 4.2,
 }: TshirtViewerProps) {
   return (
-    <div className="relative w-full h-full bg-[#0a0a0a] cursor-grab active:cursor-grabbing">
+    <div className="relative w-full h-full bg-white cursor-grab active:cursor-grabbing">
       <Canvas
         shadows
         gl={{ antialias: true }}
@@ -56,12 +56,7 @@ export default function TshirtViewer({
         </Suspense>
       </Canvas>
 
-      {/* Floating help hint at bottom */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none select-none text-center bg-black/60 px-4 py-1.5 rounded-full border border-neutral-900 backdrop-blur-sm">
-        <span className="text-[9px] font-mono text-neutral-500 uppercase tracking-widest">
-          Drag to rotate · Scroll to zoom
-        </span>
-      </div>
+
     </div>
   );
 }
