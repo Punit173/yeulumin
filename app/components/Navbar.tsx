@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ShoppingBag, Sparkles, Menu, X } from "lucide-react";
 import { useCartStore, getCartTotalItems } from "../store/cartStore";
+import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -16,31 +17,31 @@ export default function Navbar() {
     setMounted(true);
   }, []);
 
+  const { user, profile, loading, signOut } = useAuth();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   const items = useCartStore((state) => state.items);
   const cartItemCount = mounted ? getCartTotalItems(items) : 0;
 
   const navLinks = [
     { name: "Home", href: "/" },
-    { name: "Collection", href: "/products" },
+    { name: "Gallery", href: "/products" },
     { name: "Design Lab", href: "/customize" },
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-neutral-900 bg-[#0A0A0A]/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-neutral-200/60 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl h-20 items-center justify-between px-4 sm:px-6 lg:px-8">
+        
         {/* Left: Brand Logo */}
-        <Link href="/" className="group flex items-center gap-3">
-          <img
-            src="/logos/trimmed_yeulumin ai-05.png"
-            alt="Yeulumin AI Icon"
-            className="h-8 w-8 object-contain transition-transform duration-300 group-hover:rotate-12"
-          />
-          {/* <img
-            src="/logos/trimmed_yeulumin ai-02.png"
-            alt="Yeulumin AI Logo"
-            className="h-4.5 w-auto object-contain brightness-100 group-hover:brightness-110 transition-all"
-          /> */}
-          <p className="text-sm font-bold tracking-wide text-white group-hover:glow-text-neon transition-all">Yeulumin AI</p>
+        <Link href="/" className="group flex items-center gap-2">
+          {/* Custom blue hexagonal logo symbol */}
+          <div className="h-7 w-7 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
+            🜉
+          </div>
+          <span className="text-sm font-black uppercase tracking-wider text-neutral-900">
+            Yeulumin AI
+          </span>
         </Link>
 
         {/* Center: Desktop Navigation Links */}
@@ -51,8 +52,8 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`text-sm font-medium tracking-wide transition-colors duration-200 hover:text-neon ${
-                  isActive ? "text-neon font-semibold glow-text-neon" : "text-neutral-400"
+                className={`text-xs font-bold uppercase tracking-wider transition-colors duration-200 ${
+                  isActive ? "text-blue-600" : "text-neutral-500 hover:text-neutral-900"
                 }`}
               >
                 {link.name}
@@ -65,22 +66,90 @@ export default function Navbar() {
         <div className="hidden md:flex items-center space-x-6">
           <Link
             href="/cart"
-            className="relative flex items-center justify-center p-2 text-neutral-400 hover:text-neon transition-colors"
+            className="relative flex items-center justify-center p-2 text-neutral-600 hover:text-neutral-900 transition-colors"
           >
             <ShoppingBag className="h-5 w-5" />
             {cartItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet text-[10px] font-bold text-white ring-2 ring-[#0A0A0A] animate-pulse">
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white ring-2 ring-white animate-pulse">
                 {cartItemCount}
               </span>
             )}
           </Link>
 
+          {/* User Account Dropdown */}
+          {!loading && mounted && (
+            <div className="relative">
+              {user ? (
+                <>
+                  <button
+                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer text-xs font-mono py-2 focus:outline-none"
+                  >
+                    {profile?.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt="User avatar"
+                        className="h-6 w-6 rounded-full object-cover border border-neutral-200"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center text-[10px] font-bold text-neutral-800">
+                        {profile?.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}
+                      </div>
+                    )}
+                    <span className="max-w-[80px] truncate text-neutral-700 font-bold uppercase tracking-wide">
+                      {profile?.full_name || user.email?.split("@")[0]}
+                    </span>
+                  </button>
+                  {dropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 rounded-xl bg-white border border-neutral-200 p-2 shadow-2xl z-50 flex flex-col gap-1">
+                      <span className="px-3 py-1.5 text-[9px] text-neutral-400 font-mono border-b border-neutral-100 truncate">
+                        {user.email}
+                      </span>
+                      <Link
+                        href="/collection"
+                        onClick={() => setDropdownOpen(false)}
+                        className="px-3 py-2 text-xs text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 rounded-lg transition-colors font-medium text-left"
+                      >
+                        My Collection
+                      </Link>
+                      {profile?.is_admin && (
+                        <Link
+                          href="/yeulumin-admin"
+                          onClick={() => setDropdownOpen(false)}
+                          className="px-3 py-2 text-xs text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 rounded-lg transition-colors font-medium text-left border-t border-neutral-100"
+                        >
+                          Admin Panel
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => {
+                          setDropdownOpen(false);
+                          signOut();
+                        }}
+                        className="px-3 py-2 text-xs text-red-500 hover:bg-red-50 rounded-lg transition-colors font-medium text-left cursor-pointer border-t border-neutral-100 w-full"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link
+                  href="/auth"
+                  className="text-xs font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-900 transition-colors"
+                >
+                  SIGN IN
+                </Link>
+              )}
+            </div>
+          )}
+
           <Link
             href="/customize"
-            className="inline-flex items-center gap-2 rounded-lg bg-neon px-4 py-2 text-xs font-semibold text-[#0A0A0A] hover:bg-[#00e6a0] transition-all duration-300 glow-neon"
+            className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-md shadow-blue-500/20 hover:scale-103 transition-all duration-300"
           >
-            <Sparkles className="h-3.5 w-3.5 fill-[#0A0A0A]/20" />
-            <span>DESIGN NOW</span>
+            <Sparkles className="h-3.5 w-3.5 fill-white/20" />
+            <span>DESIGN LAB</span>
           </Link>
         </div>
 
@@ -88,18 +157,18 @@ export default function Navbar() {
         <div className="flex items-center gap-4 md:hidden">
           <Link
             href="/cart"
-            className="relative flex items-center justify-center p-2 text-neutral-400 hover:text-neon transition-colors"
+            className="relative flex items-center justify-center p-2 text-neutral-600 hover:text-neutral-950 transition-colors"
           >
             <ShoppingBag className="h-5 w-5" />
             {cartItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet text-[10px] font-bold text-white ring-2 ring-[#0A0A0A]">
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white ring-2 ring-white">
                 {cartItemCount}
               </span>
             )}
           </Link>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="text-neutral-400 hover:text-neon p-2 transition-colors focus:outline-none"
+            className="text-neutral-600 hover:text-neutral-950 p-2 transition-colors focus:outline-none"
           >
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -108,26 +177,67 @@ export default function Navbar() {
 
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-neutral-900 bg-[#0A0A0A] py-6 px-4 space-y-4 animate-fade-in">
-          <nav className="flex flex-col space-y-4">
+        <div className="md:hidden border-t border-neutral-200/60 bg-white py-6 px-4 space-y-4 animate-fade-in shadow-xl">
+          <nav className="flex flex-col space-y-4 text-left">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`text-base font-medium tracking-wide transition-colors ${
-                  pathname === link.href ? "text-neon font-semibold" : "text-neutral-400"
+                className={`text-sm font-bold uppercase tracking-wider transition-colors ${
+                  pathname === link.href ? "text-blue-600" : "text-neutral-500 hover:text-neutral-900"
                 }`}
               >
                 {link.name}
               </Link>
             ))}
           </nav>
-          <div className="pt-4 border-t border-neutral-900">
+          <div className="pt-4 border-t border-neutral-100 flex flex-col gap-3">
+            {user && (
+              <div className="flex flex-col gap-2 pb-2 text-left">
+                <span className="text-[10px] text-neutral-400 font-mono truncate px-1">
+                  LOGGED IN AS: {user.email}
+                </span>
+                <Link
+                  href="/collection"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-sm font-bold uppercase tracking-wider text-neutral-600 hover:text-neutral-900 transition-colors px-1"
+                >
+                  My Collection
+                </Link>
+                {profile?.is_admin && (
+                  <Link
+                    href="/yeulumin-admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-sm font-bold uppercase tracking-wider text-neutral-600 hover:text-neutral-900 transition-colors px-1 border-t border-neutral-100 pt-2"
+                  >
+                    Admin Panel
+                  </Link>
+                )}
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    signOut();
+                  }}
+                  className="text-sm font-bold uppercase tracking-wider text-red-500 hover:text-red-600 transition-colors text-left px-1 border-t border-neutral-100 pt-2 cursor-pointer w-full"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+            {!user && !loading && (
+              <Link
+                href="/auth"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 py-3 text-xs font-bold uppercase tracking-wider text-neutral-600 hover:text-neutral-900 transition-all"
+              >
+                SIGN IN
+              </Link>
+            )}
             <Link
               href="/customize"
               onClick={() => setMobileMenuOpen(false)}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-neon py-3 text-sm font-semibold text-[#0A0A0A] glow-neon"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-md shadow-blue-500/20"
             >
               <Sparkles className="h-4 w-4" />
               <span>DESIGN LAB</span>

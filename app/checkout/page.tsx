@@ -7,6 +7,8 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import GrainOverlay from "../components/GrainOverlay";
 import { useCartStore, getCartSubtotal, getCartShipping, getCartTotal } from "../store/cartStore";
+import { useAuth } from "../context/AuthContext";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 
 // Confetti Particle Physics Simulator
 function ConfettiCanvas() {
@@ -28,7 +30,7 @@ function ConfettiCanvas() {
     };
     window.addEventListener("resize", handleResize);
 
-    const colors = ["#00FFB2", "#7B2FFF", "#ffffff", "#0047FF"];
+    const colors = ["#2563eb", "#10b981", "#7c3aed", "#3b82f6"];
     const particles: Array<{
       x: number;
       y: number;
@@ -42,7 +44,7 @@ function ConfettiCanvas() {
       opacity: number;
     }> = [];
 
-    // Create a rich upwards burst of neon sparks
+    // Create a rich upwards burst of sparks
     for (let i = 0; i < 180; i++) {
       particles.push({
         x: width / 2,
@@ -110,6 +112,7 @@ export default function CheckoutPage() {
     setMounted(true);
   }, []);
 
+  const { user } = useAuth();
   const items = useCartStore((state) => state.items);
   const clearCart = useCartStore((state) => state.clearCart);
 
@@ -151,12 +154,13 @@ export default function CheckoutPage() {
     setStep(2);
   };
 
-  const handlePaymentSubmit = (e: React.FormEvent) => {
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Generate Order ID & Delivery Date (5 business days out)
     const randomNum = Math.floor(100000 + Math.random() * 900000);
-    setOrderId(`YL-${randomNum}`);
+    const generatedId = `YL-${randomNum}`;
+    setOrderId(generatedId);
 
     const estimate = new Date();
     estimate.setDate(estimate.getDate() + 5);
@@ -168,6 +172,48 @@ export default function CheckoutPage() {
         day: "numeric",
       })
     );
+
+    // Save order data to Supabase if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: orderData, error: orderError } = await supabase
+          .from("orders")
+          .insert({
+            user_id: user?.id || null,
+            email: shippingForm.email,
+            status: "pending",
+            total_price: total,
+            shipping_address: shippingForm,
+          })
+          .select()
+          .single();
+
+        if (orderError) throw orderError;
+
+        if (orderData && cartItems.length > 0) {
+          const itemsToInsert = cartItems.map((item) => ({
+            order_id: orderData.id,
+            product_id: item.id.startsWith("configured-") ? null : item.id,
+            customization_id: null,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            size: item.size,
+            color: item.color,
+            style: item.style || "Plain",
+            image: item.image,
+          }));
+
+          const { error: itemsError } = await supabase
+            .from("order_items")
+            .insert(itemsToInsert);
+
+          if (itemsError) throw itemsError;
+        }
+      } catch (err) {
+        console.error("Failed to write order metrics to database:", err);
+      }
+    }
 
     // Clean cart state
     clearCart();
@@ -185,16 +231,17 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#0A0A0A] text-[#f5f5f5]">
+    <div className="relative min-h-screen flex flex-col bg-[#F5F6F8] text-[#0A0A0A] antialiased">
       <GrainOverlay />
       <Navbar />
 
       {step === 3 && <ConfettiCanvas />}
 
-      <main className="flex-grow mx-auto max-w-4xl w-full px-4 sm:px-6 lg:px-8 py-12">
+      <main className="flex-grow mx-auto max-w-4xl w-full px-4 sm:px-6 lg:px-8 py-12 select-none">
+        
         {/* Step Indicator */}
         <div className="flex items-center justify-between max-w-md mx-auto mb-12 relative">
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-neutral-900 z-0" />
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-neutral-200 z-0" />
           
           {[
             { num: 1, label: "Shipping" },
@@ -208,17 +255,17 @@ export default function CheckoutPage() {
                 <span
                   className={`h-8 w-8 rounded-full border text-xs font-mono font-bold flex items-center justify-center transition-all ${
                     isCompleted
-                      ? "bg-neon border-neon text-[#0A0A0A] glow-neon"
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
                       : isActive
-                      ? "bg-[#111111] border-neon text-neon glow-text-neon"
-                      : "bg-[#0A0A0A] border-neutral-800 text-neutral-600"
+                      ? "bg-white border-blue-600 text-blue-600 font-bold shadow-sm"
+                      : "bg-white border-neutral-200 text-neutral-400"
                   }`}
                 >
                   {s.num}
                 </span>
                 <span
-                  className={`text-[10px] uppercase font-mono tracking-wider ${
-                    isActive ? "text-neon glow-text-neon font-bold" : "text-neutral-500"
+                  className={`text-[9px] uppercase font-mono tracking-wider font-bold ${
+                    isActive ? "text-blue-600 font-black" : "text-neutral-400"
                   }`}
                 >
                   {s.label}
@@ -231,115 +278,115 @@ export default function CheckoutPage() {
         {/* STEP 1: SHIPPING DETAILS */}
         {step === 1 && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-8 bg-[#111111]/30 border border-neutral-900 rounded-xl p-6 sm:p-8">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-400 font-mono mb-6 pb-3 border-b border-neutral-900 flex items-center gap-2">
-                <Truck className="h-4 w-4 text-neon" />
-                <span>Shipping Destination Matrix</span>
+            <div className="lg:col-span-8 bg-white border border-neutral-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-800 font-sans mb-6 pb-3 border-b border-neutral-100 flex items-center gap-2 text-left">
+                <Truck className="h-4.5 w-4.5 text-blue-600" />
+                <span>Shipping Destination</span>
               </h2>
 
-              <form onSubmit={handleShippingSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs">
+              <form onSubmit={handleShippingSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-xs text-left">
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className="font-mono text-neutral-500 uppercase">Full Name</label>
+                  <label className="font-mono text-neutral-400 uppercase">Full Name</label>
                   <input
                     type="text"
                     required
                     value={shippingForm.fullName}
                     onChange={(e) => setShippingForm({ ...shippingForm, fullName: e.target.value })}
                     placeholder="Jax Vandal"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-neutral-500 uppercase">Email Address</label>
+                  <label className="font-mono text-neutral-400 uppercase">Email Address</label>
                   <input
                     type="email"
                     required
                     value={shippingForm.email}
                     onChange={(e) => setShippingForm({ ...shippingForm, email: e.target.value })}
                     placeholder="vandal@hypegrid.com"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-neutral-500 uppercase">Phone Code</label>
+                  <label className="font-mono text-neutral-400 uppercase">Phone Number</label>
                   <input
                     type="tel"
                     required
                     value={shippingForm.phone}
                     onChange={(e) => setShippingForm({ ...shippingForm, phone: e.target.value })}
                     placeholder="+91 98765 43210"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className="font-mono text-neutral-500 uppercase">Address Line 1</label>
+                  <label className="font-mono text-neutral-400 uppercase">Address Line 1</label>
                   <input
                     type="text"
                     required
                     value={shippingForm.address1}
                     onChange={(e) => setShippingForm({ ...shippingForm, address1: e.target.value })}
                     placeholder="Plot 42, Cyberpunk Boulevard, Layer 3"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <label className="font-mono text-neutral-500 uppercase">Address Line 2 (Optional)</label>
+                  <label className="font-mono text-neutral-400 uppercase">Address Line 2 (Optional)</label>
                   <input
                     type="text"
                     value={shippingForm.address2}
                     onChange={(e) => setShippingForm({ ...shippingForm, address2: e.target.value })}
                     placeholder="Block Neon, Sector 9"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-neutral-500 uppercase">City</label>
+                  <label className="font-mono text-neutral-400 uppercase">City</label>
                   <input
                     type="text"
                     required
                     value={shippingForm.city}
                     onChange={(e) => setShippingForm({ ...shippingForm, city: e.target.value })}
                     placeholder="Bangalore"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-neutral-500 uppercase">State</label>
+                  <label className="font-mono text-neutral-400 uppercase">State</label>
                   <input
                     type="text"
                     required
                     value={shippingForm.state}
                     onChange={(e) => setShippingForm({ ...shippingForm, state: e.target.value })}
                     placeholder="Karnataka"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-neutral-500 uppercase">PIN Code</label>
+                  <label className="font-mono text-neutral-400 uppercase">PIN Code</label>
                   <input
                     type="text"
                     required
                     value={shippingForm.pinCode}
                     onChange={(e) => setShippingForm({ ...shippingForm, pinCode: e.target.value })}
                     placeholder="560001"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-neutral-500 uppercase">Country</label>
+                  <label className="font-mono text-neutral-400 uppercase">Country</label>
                   <input
                     type="text"
                     required
                     value={shippingForm.country}
                     onChange={(e) => setShippingForm({ ...shippingForm, country: e.target.value })}
                     placeholder="India"
-                    className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                    className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="sm:col-span-2 py-3 bg-neon hover:bg-[#00e6a0] text-[#0A0A0A] font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all glow-neon font-display text-xs cursor-pointer mt-4"
+                  className="sm:col-span-2 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20 font-sans text-xs cursor-pointer mt-4"
                 >
                   <span>Continue to Payment</span>
                   <ChevronRight className="h-4 w-4" />
@@ -348,24 +395,24 @@ export default function CheckoutPage() {
             </div>
 
             {/* Billing receipt sidebar */}
-            <div className="lg:col-span-4 bg-[#111111]/30 border border-neutral-900 rounded-xl p-6 flex flex-col gap-4">
-              <h3 className="font-display font-semibold uppercase tracking-wider text-neutral-400 text-xs pb-3 border-b border-neutral-900">
+            <div className="lg:col-span-4 bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col gap-4 shadow-sm text-left">
+              <h3 className="font-sans font-bold uppercase tracking-wider text-neutral-700 text-xs pb-3 border-b border-neutral-100">
                 Order Value
               </h3>
               <div className="flex flex-col gap-3 font-mono text-xs text-neutral-500">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="text-neutral-300">₹{subtotal}</span>
+                  <span className="text-neutral-800">₹{subtotal}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Shipping</span>
-                  <span className="text-neutral-300">{shipping === 0 ? "Free" : `₹${shipping}`}</span>
+                  <span className="text-neutral-800">{shipping === 0 ? "Free" : `₹${shipping}`}</span>
                 </div>
               </div>
-              <div className="h-[1px] bg-neutral-900 my-1" />
+              <div className="h-[1px] bg-neutral-100 my-1" />
               <div className="flex justify-between items-baseline">
-                <span className="text-xs uppercase font-mono font-bold text-neutral-400">Total</span>
-                <span className="font-mono text-neon glow-text-neon text-lg font-bold">₹{total}</span>
+                <span className="text-xs uppercase font-sans font-bold text-neutral-500">Total Price</span>
+                <span className="font-sans text-neutral-900 text-lg font-black">₹{total}</span>
               </div>
             </div>
           </div>
@@ -374,14 +421,14 @@ export default function CheckoutPage() {
         {/* STEP 2: MOCK PAYMENT UI */}
         {step === 2 && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            <div className="lg:col-span-8 bg-[#111111]/30 border border-neutral-900 rounded-xl p-6 sm:p-8">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-400 font-mono mb-6 pb-3 border-b border-neutral-900 flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-neon" />
+            <div className="lg:col-span-8 bg-white border border-neutral-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-800 font-sans mb-6 pb-3 border-b border-neutral-100 flex items-center gap-2 text-left">
+                <CreditCard className="h-4.5 w-4.5 text-blue-600" />
                 <span>Secure Payment Terminal</span>
               </h2>
 
               {/* Payment Tabs */}
-              <div className="flex border-b border-neutral-900 mb-6 gap-2">
+              <div className="flex border-b border-neutral-200 mb-6 gap-2">
                 {(["card", "upi", "netbanking"] as const).map((tab) => (
                   <button
                     key={tab}
@@ -389,8 +436,8 @@ export default function CheckoutPage() {
                     onClick={() => setActivePaymentTab(tab)}
                     className={`py-2 px-4 text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer border-b-2 -mb-[2px] ${
                       activePaymentTab === tab
-                        ? "border-neon text-neon font-bold glow-text-neon"
-                        : "border-transparent text-neutral-500 hover:text-neutral-300"
+                        ? "border-blue-600 text-blue-600 font-bold"
+                        : "border-transparent text-neutral-400 hover:text-neutral-700"
                     }`}
                   >
                     {tab === "card" ? "Credit/Debit Card" : tab.toUpperCase()}
@@ -400,20 +447,20 @@ export default function CheckoutPage() {
 
               {/* Card tab form */}
               {activePaymentTab === "card" && (
-                <form onSubmit={handlePaymentSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-xs">
+                <form onSubmit={handlePaymentSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-xs text-left">
                   <div className="flex flex-col gap-1.5 sm:col-span-3">
-                    <label className="font-mono text-neutral-500 uppercase">Cardholder Name</label>
+                    <label className="font-mono text-neutral-400 uppercase">Cardholder Name</label>
                     <input
                       type="text"
                       required
                       value={cardForm.cardName}
                       onChange={(e) => setCardForm({ ...cardForm, cardName: e.target.value })}
                       placeholder="JAX VANDAL"
-                      className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                      className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5 sm:col-span-3">
-                    <label className="font-mono text-neutral-500 uppercase">Card Number</label>
+                    <label className="font-mono text-neutral-400 uppercase">Card Number</label>
                     <input
                       type="text"
                       required
@@ -421,11 +468,11 @@ export default function CheckoutPage() {
                       onChange={(e) => setCardForm({ ...cardForm, cardNumber: e.target.value })}
                       placeholder="4321 0987 6543 2109"
                       maxLength={19}
-                      className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                      className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5 sm:col-span-2">
-                    <label className="font-mono text-neutral-500 uppercase">Expiry Date</label>
+                    <label className="font-mono text-neutral-400 uppercase">Expiry Date</label>
                     <input
                       type="text"
                       required
@@ -433,11 +480,11 @@ export default function CheckoutPage() {
                       onChange={(e) => setCardForm({ ...cardForm, expiry: e.target.value })}
                       placeholder="MM/YY"
                       maxLength={5}
-                      className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                      className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-mono text-neutral-500 uppercase">CVV / Security Code</label>
+                    <label className="font-mono text-neutral-400 uppercase">CVV</label>
                     <input
                       type="password"
                       required
@@ -445,15 +492,15 @@ export default function CheckoutPage() {
                       onChange={(e) => setCardForm({ ...cardForm, cvv: e.target.value })}
                       placeholder="•••"
                       maxLength={3}
-                      className="bg-[#111111] border border-neutral-800 focus:border-neon rounded px-3 py-2 text-neutral-300 placeholder-neutral-700 focus:outline-none transition-colors"
+                      className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors shadow-sm"
                     />
                   </div>
 
-                  <div className="sm:col-span-3 flex items-center justify-between mt-4 border-t border-neutral-900 pt-6 gap-4">
+                  <div className="sm:col-span-3 flex items-center justify-between mt-4 border-t border-neutral-100 pt-6 gap-4">
                     <button
                       type="button"
                       onClick={() => setStep(1)}
-                      className="inline-flex items-center gap-1.5 text-xs text-neutral-500 hover:text-neutral-300 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-neutral-700 cursor-pointer"
                     >
                       <ChevronLeft className="h-4 w-4" />
                       <span>Back to Shipping</span>
@@ -461,7 +508,7 @@ export default function CheckoutPage() {
 
                     <button
                       type="submit"
-                      className="py-3 px-8 bg-violet hover:bg-[#8d47ff] text-white font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all glow-violet font-display text-xs cursor-pointer"
+                      className="py-3.5 px-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20 font-sans text-xs cursor-pointer"
                     >
                       <span>Authorize Payment • ₹{total}</span>
                     </button>
@@ -472,16 +519,16 @@ export default function CheckoutPage() {
               {/* UPI Tab */}
               {activePaymentTab === "upi" && (
                 <div className="text-center py-10 flex flex-col items-center gap-4 text-xs font-mono">
-                  <div className="p-3 bg-[#111111] border border-neutral-800 rounded-lg text-neon glow-text-neon text-lg tracking-widest font-black uppercase">
+                  <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-blue-600 text-base tracking-widest font-black uppercase">
                     UPI SCAN TERMINAL
                   </div>
                   <p className="text-neutral-500 max-w-sm leading-relaxed">
                     UPI interface mapping active. Send transaction request to: <br />
-                    <strong className="text-neutral-300">yeulumin@ybl</strong>
+                    <strong className="text-neutral-800 font-sans">yeulumin@ybl</strong>
                   </p>
                   <button
                     onClick={handlePaymentSubmit}
-                    className="py-3 px-8 bg-violet hover:bg-[#8d47ff] text-white font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all glow-violet font-display text-xs cursor-pointer mt-4"
+                    className="py-3.5 px-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20 font-sans text-xs cursor-pointer mt-4"
                   >
                     <span>Simulate UPI Payment Success</span>
                   </button>
@@ -492,11 +539,11 @@ export default function CheckoutPage() {
               {activePaymentTab === "netbanking" && (
                 <div className="text-center py-10 flex flex-col items-center gap-4 text-xs font-mono">
                   <p className="text-neutral-500">
-                    Netbanking redirects are encrypted using standard protocol.
+                    Netbanking redirects are encrypted using secure protocols.
                   </p>
                   <button
                     onClick={handlePaymentSubmit}
-                    className="py-3 px-8 bg-violet hover:bg-[#8d47ff] text-white font-bold uppercase tracking-widest rounded-lg flex items-center justify-center gap-1.5 transition-all glow-violet font-display text-xs cursor-pointer"
+                    className="py-3.5 px-8 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md shadow-blue-500/20 font-sans text-xs cursor-pointer"
                   >
                     <span>Simulate Bank Authentication Success</span>
                   </button>
@@ -506,24 +553,24 @@ export default function CheckoutPage() {
             </div>
 
             {/* Bill summary sidebar */}
-            <div className="lg:col-span-4 bg-[#111111]/30 border border-neutral-900 rounded-xl p-6 flex flex-col gap-4">
-              <h3 className="font-display font-semibold uppercase tracking-wider text-neutral-400 text-xs pb-3 border-b border-neutral-900">
+            <div className="lg:col-span-4 bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col gap-4 shadow-sm text-left">
+              <h3 className="font-sans font-bold uppercase tracking-wider text-neutral-700 text-xs pb-3 border-b border-neutral-100">
                 Order Value
               </h3>
               <div className="flex flex-col gap-3 font-mono text-xs text-neutral-500">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="text-neutral-300">₹{subtotal}</span>
+                  <span className="text-neutral-800">₹{subtotal}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Shipping</span>
-                  <span className="text-neutral-300">{shipping === 0 ? "Free" : `₹${shipping}`}</span>
+                  <span className="text-neutral-800">{shipping === 0 ? "Free" : `₹${shipping}`}</span>
                 </div>
               </div>
-              <div className="h-[1px] bg-neutral-900 my-1" />
+              <div className="h-[1px] bg-neutral-100 my-1" />
               <div className="flex justify-between items-baseline">
-                <span className="text-xs uppercase font-mono font-bold text-neutral-400">Total</span>
-                <span className="font-mono text-neon glow-text-neon text-lg font-bold">₹{total}</span>
+                <span className="text-xs uppercase font-sans font-bold text-neutral-500">Total Price</span>
+                <span className="font-sans text-neutral-900 text-lg font-black">₹{total}</span>
               </div>
             </div>
           </div>
@@ -531,54 +578,53 @@ export default function CheckoutPage() {
 
         {/* STEP 3: ORDER CONFIRMATION / SUCCESS */}
         {step === 3 && (
-          <div className="max-w-2xl mx-auto bg-[#111111]/30 border border-neutral-900 rounded-2xl p-8 sm:p-12 text-center flex flex-col items-center gap-8 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-neon via-violet to-neon" />
+          <div className="max-w-2xl mx-auto bg-white border border-neutral-200 rounded-3xl p-8 sm:p-12 text-center flex flex-col items-center gap-8 relative overflow-hidden shadow-md">
             
             {/* Animated Success Ring */}
-            <div className="p-4 rounded-full bg-neon/10 border border-neon/30 text-neon glow-text-neon animate-pulse">
+            <div className="p-4 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 animate-pulse">
               <CheckCircle2 className="h-12 w-12" />
             </div>
 
             <div className="flex flex-col gap-2">
-              <h2 className="font-display text-2xl sm:text-4xl font-extrabold uppercase tracking-wide text-white">
+              <h2 className="font-sans text-2xl sm:text-3xl font-black uppercase tracking-wide text-neutral-900">
                 TRANSACTION COMPLETED
               </h2>
-              <p className="text-xs font-mono text-neutral-500">
+              <p className="text-xs font-mono text-neutral-400">
                 Order compiled into dispatch matrix.
               </p>
             </div>
 
             {/* Order Card Detail Info */}
-            <div className="w-full bg-neutral-950/60 border border-neutral-900/60 rounded-xl p-5 flex flex-col gap-4 font-mono text-xs text-neutral-400 text-left">
-              <div className="flex justify-between items-center pb-3 border-b border-neutral-900">
-                <span className="text-neutral-500">Order ID Code:</span>
+            <div className="w-full bg-[#F9FAFB] border border-neutral-200 rounded-2xl p-5 flex flex-col gap-4 font-mono text-xs text-neutral-500 text-left shadow-inner">
+              <div className="flex justify-between items-center pb-3 border-b border-neutral-200">
+                <span className="text-neutral-400">Order ID:</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-neon glow-text-neon font-bold">{orderId}</span>
+                  <span className="text-neutral-950 font-bold">{orderId}</span>
                   <button
                     onClick={copyOrderId}
-                    className="p-1 hover:text-white transition-colors cursor-pointer"
+                    className="p-1 hover:text-black transition-colors cursor-pointer"
                     title="Copy Order ID"
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </button>
-                  {isCopied && <span className="text-[9px] text-neon uppercase">Copied!</span>}
+                  {isCopied && <span className="text-[9px] text-blue-600 uppercase">Copied!</span>}
                 </div>
               </div>
 
               <div className="flex flex-col gap-2">
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Recipient:</span>
-                  <span className="text-neutral-200">{shippingForm.fullName}</span>
+                  <span className="text-neutral-400">Recipient:</span>
+                  <span className="text-neutral-800 font-sans">{shippingForm.fullName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Destination:</span>
-                  <span className="text-neutral-200 text-right">
+                  <span className="text-neutral-400">Destination:</span>
+                  <span className="text-neutral-800 text-right font-sans">
                     {shippingForm.city}, {shippingForm.state}, IN
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-neutral-500">Estimate Delivery:</span>
-                  <span className="text-neon font-bold text-right">{deliveryDate}</span>
+                  <span className="text-neutral-400">Estimate Delivery:</span>
+                  <span className="text-blue-600 font-bold text-right">{deliveryDate}</span>
                 </div>
               </div>
             </div>
@@ -589,7 +635,7 @@ export default function CheckoutPage() {
                 onClick={() => {
                   alert(`Tracking code generated. Checking logs for Order ID: ${orderId}... Shipment status: IN TRANSIT.`);
                 }}
-                className="flex-grow py-3 bg-[#111111] border border-neutral-800 text-neutral-300 hover:border-neon hover:text-neon text-xs font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-grow py-3.5 bg-white border border-neutral-200 text-neutral-700 hover:border-neutral-400 hover:text-black text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Terminal className="h-4 w-4" />
                 <span>Track Your Order</span>
@@ -597,7 +643,7 @@ export default function CheckoutPage() {
 
               <Link
                 href="/products"
-                className="flex-grow py-3 bg-neon text-[#0A0A0A] hover:bg-[#00e6a0] text-xs font-black uppercase tracking-wider rounded-lg transition-all glow-neon font-display flex items-center justify-center"
+                className="flex-grow py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md shadow-blue-500/20 hover:scale-103 font-sans flex items-center justify-center"
               >
                 <span>Continue Shopping →</span>
               </Link>

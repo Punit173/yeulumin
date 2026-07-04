@@ -1,495 +1,437 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { ArrowRight, Sparkles, Shield, Cpu, Truck, ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Sparkles, ShoppingBag, Heart, Search, SlidersHorizontal, ArrowRight, Home as HomeIcon, Image as GalleryIcon, User, Menu, X, ArrowLeft } from "lucide-react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import GrainOverlay from "./components/GrainOverlay";
-import ParticleCanvas from "./components/ParticleCanvas";
-import dynamic from "next/dynamic";
-import { useViewerStore } from "@/components/viewer/useViewerStore";
-import { PRODUCTS } from "./lib/products";
+import { PRODUCTS, Product } from "./lib/products";
+import { useAuth } from "./context/AuthContext";
+import { useCartStore } from "./store/cartStore";
 
-// Dynamically import the interactive 3D T-shirt configurator viewer
-const TshirtViewer = dynamic(() => import("@/components/viewer/TshirtViewer"), {
-  ssr: false,
-});
+export default function HomePage() {
+  const { user } = useAuth();
+  const router = useRouter();
+  const addItem = useCartStore((state) => state.addItem);
 
-// Client-side text-scramble/glitch effect component
-function GlitchText({ text }: { text: string }) {
-  const [displayText, setDisplayText] = useState(text);
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!_";
+  // States
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [cartSuccessId, setCartSuccessId] = useState<string | null>(null);
+  const [wishlistedIds, setWishlistedIds] = useState<string[]>([]);
+  const [heroSlide, setHeroSlide] = useState(0);
 
+  // Auto slide dots indicator simulation
   useEffect(() => {
-    let iteration = 0;
-    let interval: NodeJS.Timeout;
+    const timer = setInterval(() => {
+      setHeroSlide((prev) => (prev + 1) % 3);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
 
-    const triggerGlitch = () => {
-      iteration = 0;
-      clearInterval(interval);
-      interval = setInterval(() => {
-        setDisplayText(
-          text
-            .split("")
-            .map((char, index) => {
-              if (char === " ") return " ";
-              if (index < iteration) {
-                return text[index];
-              }
-              return letters[Math.floor(Math.random() * letters.length)];
-            })
-            .join("")
-        );
-
-        if (iteration >= text.length) {
-          clearInterval(interval);
-        }
-        iteration += 1 / 3;
-      }, 25);
-    };
-
-    triggerGlitch();
-    const mainInterval = setInterval(triggerGlitch, 5000);
-
-    return () => {
-      clearInterval(interval);
-      clearInterval(mainInterval);
-    };
-  }, [text]);
-
-  return (
-    <span className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-none bg-gradient-to-r from-[#f5f5f5] via-white to-neutral-400 bg-clip-text text-transparent">
-      {displayText}
-    </span>
-  );
-}
-
-export default function Home() {
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const setColor = useViewerStore((state) => state.setColor);
-  const setDesign = useViewerStore((state) => state.setDesign);
-
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Set default futuristic preview state for the home page hero configurator
-  useEffect(() => {
-    setColor("#1a1a1a");
-    setDesign("logo");
-
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [setColor, setDesign]);
-  
-  // Carousel Navigation
-  const scroll = (direction: "left" | "right") => {
-    if (carouselRef.current) {
-      const scrollAmount = 350;
-      carouselRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
-        behavior: "smooth",
-      });
-    }
+  const handleToggleWishlist = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setWishlistedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
-  const trendingDrops = PRODUCTS.slice(0, 4);
+  const handleAddToCart = (product: Product, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      router.push(`/auth?redirect=/`);
+      return;
+    }
+
+    addItem({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      quantity: 1,
+      size: "M",
+      color: product.defaultColor || "#ffffff",
+      image: product.image,
+      style: product.printPosition || "front",
+    });
+
+    setCartSuccessId(product.id);
+    setTimeout(() => setCartSuccessId(null), 2500);
+  };
+
+  // Filtered products list
+  const filteredProducts = useMemo(() => {
+    let result = [...PRODUCTS];
+
+    if (selectedCategory !== "All") {
+      result = result.filter(
+        (p) => p.category.toLowerCase() === selectedCategory.toLowerCase() ||
+               p.tags.some(t => t.toLowerCase() === selectedCategory.toLowerCase())
+      );
+    }
+
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.description.toLowerCase().includes(q) ||
+          p.tags.some((t) => t.toLowerCase().includes(q))
+      );
+    }
+
+    return result;
+  }, [selectedCategory, searchQuery]);
 
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#0A0A0A] text-[#f5f5f5]">
-      {/* Brand aesthetic overlays */}
+    <div className="relative min-h-screen flex flex-col bg-[#F5F6F8] text-[#0A0A0A] overflow-hidden antialiased">
       <GrainOverlay />
+      
+      {/* Desktop Header Navbar */}
       <Navbar />
 
-      {/* 1. HERO SECTION */}
-      <section className="relative w-full min-h-[calc(100vh-80px)] overflow-hidden">
-        {/* Dynamic Canvas Particles */}
-        <ParticleCanvas />
-
-        {/* Ambient Glows */}
-        <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-neon/5 blur-[120px] pointer-events-none z-0" />
-        <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-96 h-96 rounded-full bg-violet/5 blur-[150px] pointer-events-none z-0" />
-
-        {/* ─── MOBILE LAYOUT (< md) ─── */}
-        <div className="flex flex-col h-[calc(100vh-80px)] md:hidden relative">
-
-          {/* Full-screen immersive background */}
-          <div className="absolute inset-0">
-            {/* Radial gradient base */}
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_35%,rgba(0,255,178,0.06)_0%,rgba(123,47,255,0.04)_50%,transparent_80%)] pointer-events-none" />
+      <main className="flex-grow mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12">
+        
+        {/* ─── 1. HERO SECTION (T-SHIRT CUSTOMIZATION FLOW) ─── */}
+        <section className="relative w-full py-8 md:py-12 flex flex-col items-center select-none">
+          {/* Main Visual Carousel */}
+          <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-6 items-center max-w-4xl relative">
             
-            {/* Animated scan line */}
-            <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-neon/20 to-transparent animate-[float_4s_ease-in-out_infinite] pointer-events-none" style={{ top: '30%' }} />
-            <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-violet/15 to-transparent animate-[float_5s_ease-in-out_infinite_reverse] pointer-events-none" style={{ top: '65%' }} />
+            {/* Visual connecting paths (electric/neon blue arcs on desktop) */}
+            <div className="hidden md:block absolute top-[40%] left-[22%] right-[22%] h-[2px] bg-gradient-to-r from-blue-400/20 via-blue-500/80 to-blue-400/20 z-0 pointer-events-none">
+              <div className="absolute inset-0 bg-blue-400 blur-sm animate-pulse" />
+            </div>
 
-            {/* Corner accent lines */}
-            <div className="absolute top-6 left-6 w-8 h-8 border-l border-t border-neon/20 pointer-events-none" />
-            <div className="absolute top-6 right-6 w-8 h-8 border-r border-t border-neon/20 pointer-events-none" />
-            <div className="absolute bottom-6 left-6 w-8 h-8 border-l border-b border-violet/20 pointer-events-none" />
-            <div className="absolute bottom-6 right-6 w-8 h-8 border-r border-b border-violet/20 pointer-events-none" />
-          </div>
-
-          {/* ── Center composition ── */}
-          <div className="flex-1 flex flex-col items-center justify-center px-6 relative z-10">
-
-            {/* Top micro-badge */}
-            <div className="mb-6">
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-neon/30 bg-neon/5 px-3 py-1 text-[9px] font-bold text-neon uppercase tracking-[3px] font-mono">
-                <Sparkles className="h-2.5 w-2.5" />
-                <span>AI-Powered Fashion</span>
+            {/* Left Card: Blank Shirt */}
+            <div className="flex flex-col items-center bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm z-10 transition-all duration-300 hover:shadow-md">
+              <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest mb-3">
+                01. SELECT CANVAS
+              </span>
+              <div className="aspect-square w-full max-w-[200px] flex items-center justify-center bg-[#F9FAFB] rounded-xl overflow-hidden p-4">
+                <img
+                  src="https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80"
+                  alt="Blank template t-shirt"
+                  className="max-h-full max-w-full object-contain"
+                />
               </div>
             </div>
 
-            {/* Floating T-shirt with logo */}
-            <div className="relative mb-8">
-              {/* Outer orbital ring */}
-              <div className="absolute inset-0 m-auto w-52 h-52 rounded-full border border-neon/8 animate-[spin_20s_linear_infinite] pointer-events-none z-20">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-neon shadow-[0_0_8px_#00FFB2,0_0_16px_#00FFB2]" />
-              </div>
-              {/* Inner orbital ring (counter-rotate) */}
-              <div className="absolute inset-0 m-auto w-36 h-36 rounded-full border border-violet/10 animate-[spin_14s_linear_infinite_reverse] pointer-events-none z-20">
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 h-1 w-1 rounded-full bg-violet shadow-[0_0_6px_#7B2FFF]" />
-              </div>
-
-              {/* 3D T-shirt viewer */}
-              <div className="relative w-52 h-52 rounded-full overflow-hidden">
-                <div className="absolute inset-0 rounded-full bg-neon/10 blur-3xl scale-75 pointer-events-none z-0" />
-                <TshirtViewer scale={1.4} autoRotateSpeed={3} cameraDistance={3.4} />
-              </div>
-            </div>
-
-            {/* Headline */}
-            <h1 className="font-display text-[2.5rem] font-black tracking-tight leading-[0.95] text-center text-white mb-3">
-              WEAR YOUR<br />
-              <span className="text-neon glow-text-neon">IMAGINATION</span>
-            </h1>
-
-            {/* Tagline */}
-            <p className="text-sm text-neutral-500 text-center max-w-[260px] leading-relaxed font-light">
-              Design custom streetwear with AI. Preview in 3D. Ship worldwide.
-            </p>
-          </div>
-
-          {/* ── Bottom section: Stats + CTAs ── */}
-          <div className="relative z-10 px-5 pb-6 flex flex-col gap-3">
-
-            {/* Horizontal stat strip */}
-            <div className="flex items-center justify-between border-t border-neutral-800/60 pt-3 px-1">
-              {[
-                { value: "280GSM", label: "Cotton" },
-                { value: "AI", label: "Design" },
-                { value: "3D", label: "Preview" },
-                { value: "48HR", label: "Ship" },
-              ].map((stat, i) => (
-                <div key={stat.label} className="flex flex-col items-center gap-0.5">
-                  <span className="text-xs font-black text-neon font-mono tracking-wide">{stat.value}</span>
-                  <span className="text-[8px] text-neutral-600 uppercase tracking-wider font-mono">{stat.label}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Primary CTA */}
-            <Link
-              href="/customize"
-              className="w-full inline-flex items-center justify-center gap-2.5 rounded-2xl bg-neon py-4 text-sm font-black text-[#0A0A0A] uppercase tracking-widest glow-neon transition-all duration-200 active:scale-[0.97]"
-            >
-              <Sparkles className="h-4 w-4 fill-current" />
-              <span>Start Designing</span>
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-
-            {/* Secondary CTA */}
-            <Link
-              href="/products"
-              className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-neutral-800 bg-[#111111]/50 py-3.5 text-xs font-semibold text-neutral-400 uppercase tracking-widest transition-all duration-200 active:scale-[0.97]"
-            >
-              <span>Browse Collection</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* ─── DESKTOP LAYOUT (≥ md) ─── */}
-        <div className="hidden md:flex items-center justify-center min-h-[calc(100vh-80px)] py-12 md:py-20">
-          <div className="mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 grid lg:grid-cols-12 gap-12 items-center z-10">
-
-            {/* Hero Left Content */}
-            <div className="lg:col-span-7 flex flex-col items-start text-left gap-6 md:gap-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-neon/30 bg-neon/5 px-3 py-1 text-xs font-semibold text-neon glow-text-neon uppercase tracking-widest font-mono">
-                <Sparkles className="h-3 w-3" />
-                <span>Next-Gen Neural Print Lab</span>
-              </div>
-
-              <div className="flex flex-col">
-                <GlitchText text="WEAR YOUR" />
-                <span className="font-display text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-none text-neon glow-text-neon -mt-2">
-                  IMAGINATION
+            {/* Middle Card: Cyberpunk Decal Graphic */}
+            <div className="flex flex-col items-center bg-[#0C0C0C] border border-neutral-900 rounded-2xl p-6 shadow-xl z-10 text-white relative min-h-[290px] justify-between">
+              <span className="text-[10px] font-mono text-neutral-600 uppercase tracking-widest">
+                02. APPLY MATRIX
+              </span>
+              
+              {/* Graphic container */}
+              <div className="w-full max-w-[170px] aspect-[3/4] border border-emerald-500/40 rounded-xl bg-black p-4 flex flex-col justify-between items-center relative overflow-hidden group shadow-[0_0_20px_rgba(16,185,129,0.15)]">
+                <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none" />
+                
+                {/* Glowing design elements */}
+                <span className="text-sm font-display font-black tracking-widest text-emerald-400 glow-text-emerald">
+                  CHAOS
+                </span>
+                
+                {/* Skull representation */}
+                <div className="my-2 text-3xl animate-pulse">💀</div>
+                
+                <span className="text-[8px] font-mono text-neutral-500 uppercase tracking-widest">
+                  YEULUMIN AI
                 </span>
               </div>
 
-              <p className="max-w-xl text-base sm:text-lg text-neutral-400 font-light leading-relaxed">
-                Design any T-shirt with AI in seconds. Interact with your customized clothing on a 3D showroom mannequin. We print in heavy-density ink and ship worldwide.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-start gap-4 w-full sm:w-auto">
-                <Link
-                  href="/customize"
-                  className="group inline-flex items-center justify-center gap-2 rounded-lg bg-neon px-6 py-3.5 text-sm font-semibold text-[#0A0A0A] hover:bg-[#00e6a0] transition-all duration-300 glow-neon"
-                >
-                  <span>Start Designing</span>
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-                <Link
-                  href="/products"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-800 bg-[#111111]/40 hover:bg-[#111111]/80 hover:border-neutral-700 px-6 py-3.5 text-sm font-semibold text-neutral-300 transition-all duration-200"
-                >
-                  <span>Browse Collection</span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Hero Right Content: 3D Configurator */}
-            <div className="lg:col-span-5 w-full h-[500px] lg:h-[620px] rounded-2xl overflow-hidden border border-neutral-800/80 bg-[#111111]/45 backdrop-blur-xl z-10 shadow-[0_0_50px_rgba(0,255,178,0.15)] hover:border-neon/30 transition-all duration-500">
-              <TshirtViewer scale={1.5} autoRotateSpeed={2.5} cameraDistance={3.2} />
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* 2. HOW IT WORKS SECTION */}
-      <section className="py-24 border-y border-neutral-900 bg-[#0A0A0A] relative z-10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-widest text-[#f5f5f5]">
-              System Protocol
-            </h2>
-            <div className="h-[2px] w-12 bg-neon mx-auto mt-4" />
-            <p className="text-xs uppercase font-mono tracking-widest text-neutral-500 mt-3">
-              Three stages to custom generative streetwear
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                num: "01",
-                title: "Describe Your Vision",
-                desc: "Type a prompt detailing your aesthetic—whether it's cyberpunk circuitry, abstract liquid geometries, or glowing typography.",
-                icon: Cpu,
-              },
-              {
-                num: "02",
-                title: "Preview in Showroom",
-                desc: "Your prompt generates high-fidelity designs immediately. Wrap the texture onto our interactive 3D mannequin, rotate, and select base tee colors.",
-                icon: Shield,
-              },
-              {
-                num: "03",
-                title: "Checkout & Ship",
-                desc: "Choose your sizing. We print using high-density tactile plastisol ink, pack it in metallic courier shielding, and deliver worldwide.",
-                icon: Truck,
-              },
-            ].map((step, idx) => (
-              <div
-                key={idx}
-                className="group relative flex flex-col bg-[#111111]/30 border border-neutral-900 rounded-xl p-8 transition-all duration-300 hover:bg-[#111111]/60 hover:border-neon/30"
+              {/* Customize CTA Pill button */}
+              <Link
+                href="/customize"
+                className="inline-flex items-center gap-2 rounded-full bg-white text-[#0A0A0A] border border-neutral-200 pl-4 pr-1.5 py-1.5 text-xs font-bold shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
               >
-                <div className="flex justify-between items-start mb-6">
-                  <span className="text-4xl font-black font-display text-neutral-800 group-hover:text-neon transition-colors">
-                    {step.num}
-                  </span>
-                  <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 group-hover:text-neon group-hover:border-neon/30 transition-colors">
-                    <step.icon className="h-5 w-5" />
-                  </div>
+                <span>CUSTOMIZE YOURS</span>
+                <div className="h-6 w-6 rounded-full bg-blue-600 flex items-center justify-center text-white">
+                  <Sparkles className="h-3.5 w-3.5 fill-current" />
                 </div>
-                <h3 className="text-lg font-bold text-neutral-200 mb-3 group-hover:text-white">
-                  {step.title}
-                </h3>
-                <p className="text-xs text-neutral-500 leading-relaxed">
-                  {step.desc}
-                </p>
+              </Link>
+            </div>
+
+            {/* Right Card: Compiled Streetwear garment */}
+            <div className="flex flex-col items-center bg-white border border-neutral-200/80 rounded-2xl p-6 shadow-sm z-10 transition-all duration-300 hover:shadow-md">
+              <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest mb-3">
+                03. COMPILE APPAREL
+              </span>
+              <div className="aspect-square w-full max-w-[200px] flex items-center justify-center bg-[#F9FAFB] rounded-xl overflow-hidden p-2">
+                <img
+                  src="/collection/ChatGPT Image Jun 30, 2026, 12_24_22 PM.png"
+                  alt="Finished customized skull tee"
+                  className="max-h-full max-w-full object-contain"
+                />
               </div>
+            </div>
+
+          </div>
+
+          {/* Dots Indicator */}
+          <div className="flex items-center gap-2 mt-6">
+            {[0, 1, 2].map((i) => (
+              <button
+                key={i}
+                onClick={() => setHeroSlide(i)}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  heroSlide === i ? "w-6 bg-neutral-900" : "w-2 bg-neutral-300"
+                }`}
+              />
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 3. TRENDING DROPS CAROUSEL */}
-      <section className="py-24 bg-[#0A0A0A] relative z-10 overflow-hidden">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between mb-12">
-            <div>
-              <h2 className="font-display text-3xl sm:text-4xl font-extrabold uppercase tracking-widest text-[#f5f5f5]">
-                Trending Drops
-              </h2>
-              <div className="h-[2px] w-12 bg-violet mt-4" />
-            </div>
+        {/* ─── 2. CURRENT OFFERS BANNER ─── */}
+        <section className="my-10 w-full">
+          <div className="bg-[#0B0B0B] text-white border border-neutral-900 rounded-2xl p-8 md:p-10 relative overflow-hidden flex flex-col md:flex-row justify-between items-center shadow-xl">
             
-            <div className="flex items-center gap-4 mt-6 sm:mt-0">
+            {/* Background elements */}
+            <div className="absolute top-0 right-0 w-80 h-80 rounded-full bg-emerald-500/5 blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-72 h-72 rounded-full bg-blue-500/5 blur-[100px] pointer-events-none" />
+
+            {/* Top row controls */}
+            <div className="absolute top-6 right-6">
               <Link
                 href="/products"
-                className="text-xs font-semibold uppercase tracking-widest text-neutral-400 hover:text-neon transition-colors flex items-center gap-1.5"
+                className="text-xs font-semibold text-neutral-400 hover:text-white transition-colors flex items-center gap-1"
               >
-                <span>See All Drops</span>
-                <ArrowRight className="h-3.5 w-3.5" />
+                <span>View all</span>
+                <ArrowRight className="h-3 w-3" />
               </Link>
+            </div>
+
+            {/* Left contents */}
+            <div className="flex flex-col items-start gap-4 text-left max-w-md relative z-10">
+              <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest font-bold">
+                CURRENT OFFERS
+              </span>
+              <h2 className="font-display text-4xl sm:text-5xl font-black uppercase tracking-tight leading-none text-white">
+                FLAT <br />
+                <span className="text-emerald-400 glow-text-emerald">25% OFF</span>
+              </h2>
+              <p className="text-xs text-neutral-400 leading-relaxed max-w-xs">
+                Unlock your creative matrix with a flat discount on all bespoke AI-designed t-shirts & hoodies.
+              </p>
               
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => scroll("left")}
-                  className="p-2 rounded-lg bg-[#111111] border border-neutral-800 hover:border-neutral-700 hover:text-neon transition-colors cursor-pointer"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => scroll("right")}
-                  className="p-2 rounded-lg bg-[#111111] border border-neutral-800 hover:border-neutral-700 hover:text-neon transition-colors cursor-pointer"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+              {/* Promo Code Badge */}
+              <div className="mt-2 inline-flex items-center px-4 py-2 border border-dashed border-emerald-500/40 bg-emerald-500/5 rounded-lg text-xs font-mono font-bold text-emerald-400">
+                <span>CODE: YEULUMIN25</span>
               </div>
             </div>
+
+            {/* Right contents: Black print hoodie preview mockup */}
+            <div className="w-full max-w-[280px] aspect-square flex items-center justify-center mt-8 md:mt-0 relative z-10">
+              <img
+                src="/collection/ChatGPT Image Jun 30, 2026, 12_09_57 PM.png"
+                alt="Discount offer preview hoodie"
+                className="max-h-full max-w-full object-contain filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.6)]"
+              />
+            </div>
+
           </div>
+        </section>
 
-          {/* Carousel */}
-          <div
-            ref={carouselRef}
-            className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory no-scrollbar"
-            style={{ scrollSnapType: "x mandatory" }}
-          >
-            {trendingDrops.map((product) => (
-              <div
-                key={product.id}
-                className="flex-shrink-0 w-[280px] sm:w-[320px] snap-start bg-[#111111]/40 border border-neutral-900 hover:border-neon/30 rounded-xl overflow-hidden group transition-all duration-300"
-              >
-                {/* Product Image */}
-                <div className="relative aspect-square w-full bg-neutral-950 overflow-hidden">
-                  {/* Badge */}
-                  <span className="absolute top-3 left-3 z-10 text-[9px] font-mono font-bold tracking-widest uppercase bg-[#0A0A0A] border border-neutral-800 text-neon px-2 py-0.5 rounded">
-                    {product.badge}
-                  </span>
-                  
-                  {/* Image with zoom on hover */}
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center p-4">
-                    <Link
-                      href={`/customize?preset=${product.id}`}
-                      className="w-full text-center py-2 bg-neon text-[#0A0A0A] text-xs font-semibold rounded-lg glow-neon transition-transform"
-                    >
-                      Remix in Lab
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Product Detail */}
-                <div className="p-5 flex flex-col gap-2">
-                  <span className="text-[10px] uppercase font-mono tracking-widest text-neutral-500">
-                    {product.category}
-                  </span>
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-neutral-200 text-sm group-hover:text-white transition-colors">
-                      {product.name}
-                    </h3>
-                    <span className="font-mono text-neon font-bold text-sm">
-                      ₹{product.price}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-neutral-500 line-clamp-2 mt-1 leading-relaxed">
-                    {product.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* 4. PRESS & SOCIAL PROOF */}
-      <section className="py-24 border-t border-neutral-900 bg-[#0B0B0B] relative z-10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {/* ─── 3. PRE-DEFINED STYLES GRID SECTION ─── */}
+        <section className="my-12">
           
-          {/* Fictional Press Logos */}
-          <div className="text-center mb-16">
-            <p className="text-[10px] font-mono uppercase tracking-widest text-neutral-600 mb-6">
-              Transmitting on standard channels
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 opacity-35 hover:opacity-50 transition-opacity">
-              {["WIRED FUTURE", "NEO THREAD", "HYPEGRID", "CYBORG MONTHLY"].map((logo, idx) => (
-                <span key={idx} className="font-display text-xl sm:text-2xl font-black tracking-widest text-neutral-400">
-                  {logo}
-                </span>
-              ))}
+          {/* Header titles */}
+          <div className="flex justify-between items-end mb-8">
+            <div className="text-left flex flex-col gap-1">
+              <h2 className="font-display text-2xl font-black uppercase tracking-wider text-[#0A0A0A]">
+                PRE-DEFINED STYLES
+              </h2>
+              <div className="h-[2px] w-12 bg-neutral-900" />
             </div>
+            <Link
+              href="/products"
+              className="text-xs font-semibold text-neutral-500 hover:text-black transition-colors flex items-center gap-1"
+            >
+              <span>View all</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
 
-          {/* Testimonial Quote Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
-            {[
-              {
-                quote: "The print density is insane. Standard streetwear washes off or peels; this is high-end tactile plastisol. The AI prompt customized it exactly down to the color weights. Genuinely futuristic.",
-                author: "Jax V.",
-                title: "Techwear Collector & Editor",
-              },
-              {
-                quote: "I was skeptical about procedural clothing, but remixing design nodes in the 3D mannequin showroom was seamless. Shipping came inside an anti-static metallic protective sleeve. 10/10.",
-                author: "Kira 0x",
-                title: "Digital Art Architect",
-              },
-            ].map((t, idx) => (
-              <div
-                key={idx}
-                className="bg-[#111111]/20 border border-neutral-900/60 rounded-xl p-8 flex flex-col justify-between"
-              >
-                <p className="text-sm font-light text-neutral-400 italic leading-relaxed mb-6">
-                  "{t.quote}"
-                </p>
-                <div className="flex flex-col">
-                  <span className="font-mono text-neon text-xs font-semibold uppercase tracking-wider">
-                    {t.author}
-                  </span>
-                  <span className="text-[10px] text-neutral-600 uppercase mt-0.5">
-                    {t.title}
-                  </span>
-                </div>
-              </div>
-            ))}
+          {/* Filter Bar & Search Row */}
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-8">
+            
+            {/* Category pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto scrollbar-none">
+              {["All", "Minimal", "Streetwear", "Typographic", "Vintage", "Anime"].map((cat) => {
+                const isActive = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`text-xs font-semibold px-4 py-2 rounded-xl border transition-all duration-200 uppercase tracking-wider whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? "bg-blue-50 border-blue-500 text-blue-600 font-bold shadow-sm"
+                        : "bg-white border-neutral-200 text-neutral-400 hover:border-neutral-400 hover:text-[#0A0A0A]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search Input Box */}
+            <div className="relative w-full sm:max-w-xs">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search styles"
+                className="w-full bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl py-2 pl-9 pr-4 text-xs text-neutral-700 placeholder-neutral-400 focus:outline-none transition-all shadow-sm"
+              />
+              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-neutral-400" />
+            </div>
+
           </div>
 
-        </div>
-      </section>
+          {/* Catalog products list cards */}
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredProducts.map((product) => {
+                const isWishlisted = wishlistedIds.includes(product.id);
+                return (
+                  <div
+                    key={product.id}
+                    className="bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
+                  >
+                    <div>
+                      {/* Image container */}
+                      <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-6">
+                        
+                        {/* Custom Wishlist heart trigger */}
+                        <button
+                          onClick={(e) => handleToggleWishlist(product.id, e)}
+                          className={`absolute top-4 right-4 z-20 p-2 rounded-full border bg-white shadow-sm transition-all duration-200 hover:scale-105 cursor-pointer ${
+                            isWishlisted
+                              ? "border-red-100 text-red-500 fill-current"
+                              : "border-neutral-100 text-neutral-400 hover:text-red-500"
+                          }`}
+                        >
+                          <Heart className="h-4 w-4" />
+                        </button>
 
-      {/* 5. BRAND CTA BANNER */}
-      <section className="relative py-28 border-t border-neutral-900 bg-[#0A0A0A] overflow-hidden z-10">
-        <div className="absolute inset-0 bg-gradient-to-r from-neon/5 to-violet/5 pointer-events-none" />
-        
-        <div className="mx-auto max-w-4xl px-4 text-center flex flex-col items-center gap-6 relative z-10">
-          <h2 className="font-display text-3xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight text-[#f5f5f5] leading-none">
-            YOUR NEXT FAVORITE SHIRT <br />
-            <span className="text-neon glow-text-neon">DOESN'T EXIST YET.</span>
-          </h2>
-          <p className="text-xs sm:text-sm text-neutral-400 max-w-lg font-light leading-relaxed">
-            Stop wearing mass-produced templates. Access our neural customization matrices and compile your own streetwear code.
-          </p>
-          <Link
-            href="/customize"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-neon px-8 py-4 text-sm font-semibold text-[#0A0A0A] hover:bg-[#00e6a0] transition-all duration-300 glow-neon"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span>CREATE IT NOW</span>
-          </Link>
-        </div>
-      </section>
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-103"
+                        />
+
+                        {/* Interactive hover overlay */}
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4">
+                          <Link
+                            href={`/customize?preset=${product.id}`}
+                            className="px-6 py-2.5 bg-white text-black text-xs font-bold rounded-lg shadow hover:bg-neutral-100 transition-colors uppercase tracking-wider"
+                          >
+                            Remix in Studio
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* Detail contents */}
+                      <div className="p-6 text-left">
+                        <span className="text-[10px] uppercase font-mono tracking-widest text-neutral-400 block mb-1.5 font-bold">
+                          {product.category}
+                        </span>
+                        <div className="flex justify-between items-start mb-3">
+                          <h3 className="font-bold text-neutral-800 text-base group-hover:text-black transition-colors leading-snug">
+                            {product.name}
+                          </h3>
+                          <span className="font-mono text-neutral-900 font-bold text-base whitespace-nowrap ml-3">
+                            ₹{product.price}
+                          </span>
+                        </div>
+                        <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">
+                          {product.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Bottom Actions footer */}
+                    <div className="px-6 pb-6 pt-0 flex gap-3">
+                      <button
+                        onClick={(e) => handleAddToCart(product, e)}
+                        className="w-full py-2.5 bg-[#111111] hover:bg-black text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                      >
+                        <ShoppingBag className="h-4 w-4" />
+                        <span>{cartSuccessId === product.id ? "Added!" : "Add to Cart"}</span>
+                      </button>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-24 text-center border border-dashed border-neutral-200 rounded-2xl max-w-md mx-auto">
+              <span className="text-2xl">🔍</span>
+              <h3 className="text-sm font-bold text-neutral-400 uppercase tracking-widest mt-2">
+                No Matching Styles Found
+              </h3>
+            </div>
+          )}
+
+        </section>
+
+      </main>
 
       <Footer />
+
+      {/* ─── 4. FLOATING ACTION BUTTON ─── */}
+      <Link
+        href="/customize"
+        className="fixed bottom-24 right-6 z-40 h-14 w-14 rounded-full bg-blue-600 text-white shadow-xl hover:bg-blue-700 hover:scale-105 transition-all flex items-center justify-center md:bottom-6"
+        title="Open Design Lab"
+      >
+        <Sparkles className="h-6 w-6 fill-current" />
+      </Link>
+
+      {/* ─── 5. MOBILE BOTTOM TAB NAVIGATION ─── */}
+      <nav className="fixed bottom-0 inset-x-0 h-16 bg-white border-t border-neutral-200/80 md:hidden flex justify-around items-center z-40 px-2 shadow-[0_-5px_15px_rgba(0,0,0,0.03)]">
+        
+        <Link
+          href="/"
+          className="flex flex-col items-center gap-1 text-neutral-400 hover:text-neutral-900 transition-colors py-1.5 px-3 relative"
+        >
+          <HomeIcon className="h-5 w-5 text-neutral-900" />
+          <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-900">Home</span>
+          <div className="absolute bottom-0 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        </Link>
+
+        <Link
+          href="/products"
+          className="flex flex-col items-center gap-1 text-neutral-400 hover:text-neutral-900 transition-colors py-1.5 px-3"
+        >
+          <GalleryIcon className="h-5 w-5" />
+          <span className="text-[9px] uppercase tracking-wider font-semibold">Gallery</span>
+        </Link>
+
+        <Link
+          href="/collection"
+          className="flex flex-col items-center gap-1 text-neutral-400 hover:text-neutral-900 transition-colors py-1.5 px-3"
+        >
+          <Heart className="h-5 w-5" />
+          <span className="text-[9px] uppercase tracking-wider font-semibold">Wishlist</span>
+        </Link>
+
+        <Link
+          href={user ? "/collection" : "/auth"}
+          className="flex flex-col items-center gap-1 text-neutral-400 hover:text-neutral-900 transition-colors py-1.5 px-3"
+        >
+          <User className="h-5 w-5" />
+          <span className="text-[9px] uppercase tracking-wider font-semibold">Profile</span>
+        </Link>
+
+      </nav>
+
     </div>
   );
 }

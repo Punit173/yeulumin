@@ -3,93 +3,185 @@ export interface Product {
   name: string;
   description: string;
   price: number;
-  badge: "AI Generated" | "Bestseller" | "New Drop";
+  badge?: "Bestseller" | "New Drop" | "AI Generated";
   image: string;
   category: "Abstract" | "Typographic" | "Minimal" | "Illustrated";
   tags: string[];
+  defaultColor?: string;
+  defaultView?: "front" | "back";
+  printPosition?: "front" | "back";
+  version?: string;
 }
 
 export const PRODUCTS: Product[] = [
   {
-    id: "1",
-    name: "Neon Circuit Tee",
-    description: "High-fidelity digital circuitry overlaying premium 280GSM heavy cotton. Styled with glowing phosphor nodes.",
-    price: 1899,
+    id: "9",
+    name: "Focus On The Good",
+    description: "Inspiring white heavy-cotton tee featuring the 'Focus on the Good' typographic design with a custom smiley and planetary globe print on the back.",
+    price: 1499,
     badge: "Bestseller",
-    image: "https://images.unsplash.com/photo-1563089145-599997674d42?w=600&auto=format&fit=crop&q=80",
-    category: "Abstract",
-    tags: ["cyberpunk", "neon", "circuit"]
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_03_50 PM.png",
+    category: "Illustrated",
+    tags: ["typographic", "illustrated", "motivational"],
+    defaultColor: "#ffffff",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 1"
   },
   {
-    id: "2",
-    name: "Abstract Wave Tee",
-    description: "Fluid 3D simulation printed in ultra-dense high-gloss plastisol ink for depth and tactical texture.",
-    price: 1699,
+    id: "10",
+    name: "Rise Above All",
+    description: "Techwear-inspired black heavy hoodie with a distressed 'RISE ABOVE ALL' backprint slashed with vivid scarlet vectors.",
+    price: 2999,
     badge: "New Drop",
-    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_09_57 PM.png",
+    category: "Typographic",
+    tags: ["streetwear", "hoodie", "typographic"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 2"
+  },
+  {
+    id: "11",
+    name: "Future Is Now",
+    description: "White long sleeve tee sporting a high-fidelity vertical purple nebula and rocket launch console print, complete with authentic Japanese typography.",
+    price: 1799,
+    badge: "AI Generated",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_12_21 PM.png",
+    category: "Illustrated",
+    tags: ["cosmic", "anime", "future"],
+    defaultColor: "#ffffff",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 3"
+  },
+  {
+    id: "12",
+    name: "Chaos Core",
+    description: "Classic oversized black streetwear tee with blue gothic 'chaos' typography overlaid on a cybernetic astronomical constellation grid.",
+    price: 1599,
+    badge: "Bestseller",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_15_32 PM.png",
     category: "Abstract",
-    tags: ["fluid", "3d", "minimal"]
+    tags: ["chaos", "gothic", "geometry"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 4"
+  },
+  {
+    id: "13",
+    name: "Cosmic Wanderer",
+    description: "Deep violet neural portal and mysterious silhouetted voyager print, detailed with Japanese 'Gate of Destiny' calligraphy on a heavy black cotton tee.",
+    price: 1699,
+    badge: "AI Generated",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_17_42 PM.png",
+    category: "Illustrated",
+    tags: ["portal", "mystical", "japanese"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 5"
+  },
+  {
+    id: "14",
+    name: "Discipline Repeat",
+    description: "High-contrast block typography tee displaying repeated 'DISCIPLINE' screenprints in alternating neon red and industrial white.",
+    price: 1399,
+    badge: "New Drop",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_20_49 PM.png",
+    category: "Typographic",
+    tags: ["minimal", "discipline", "bold"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 6"
+  },
+  {
+    id: "15",
+    name: "Chaos Control",
+    description: "Heavyweight white drop-shoulder tee with a detailed graphic of a skull wearing studio headphones, accented by slime-green 'CHAOS' graffiti and pink splatters.",
+    price: 1899,
+    badge: "AI Generated",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_24_22 PM.png",
+    category: "Illustrated",
+    tags: ["skull", "chaos", "graffiti"],
+    defaultColor: "#ffffff",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 7"
+  },
+  {
+    id: "16",
+    name: "Demon Path",
+    description: "Black pullover techwear hoodie featuring a detailed crimson Oni mask graphic, red splash vectors, side Japanese characters, and the motivational 'FEAR NONE' script.",
+    price: 3199,
+    badge: "Bestseller",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 12_26_19 PM.png",
+    category: "Illustrated",
+    tags: ["oni", "demon", "streetwear"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 8"
   },
   {
     id: "3",
-    name: "Galactic Bloom Tee",
-    description: "An iridescent botanical growth pattern engineered by generative adversarial neural network expansion.",
-    price: 1999,
-    badge: "AI Generated",
-    image: "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80",
-    category: "Illustrated",
-    tags: ["floral", "nature", "generative"]
-  },
-  {
-    id: "4",
-    name: "Glitch Portrait Tee",
-    description: "A distorted typographic portrait exploring the aesthetics of human-machine memory synchronization errors.",
-    price: 1799,
-    badge: "Bestseller",
-    image: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=600&auto=format&fit=crop&q=80",
-    category: "Abstract",
-    tags: ["glitch", "portrait", "streetwear"]
-  },
-  {
-    id: "5",
-    name: "Minimal Grid Tee",
-    description: "Precision orthographic vector grid layout. Architectural coordinates mapped for perfect structural alignment.",
-    price: 1499,
+    name: "Mindset",
+    description: "Premium heavy-cotton crewneck tee in vintage cream, showcasing a clean typographic print 'FOCUS DISCIPLINE SUCCESS' with 'NO EXCUSES' tagline.",
+    price: 1699,
     badge: "New Drop",
-    image: "https://images.unsplash.com/photo-1618005198143-e5283b519a7f?w=600&auto=format&fit=crop&q=80",
-    category: "Minimal",
-    tags: ["grid", "vector", "structural"]
-  },
-  {
-    id: "6",
-    name: "Urban Sketch Tee",
-    description: "A raw collision of robotic aerosol strokes and generative spray calligraphy in a high-density black print.",
-    price: 1599,
-    badge: "AI Generated",
-    image: "https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=600&auto=format&fit=crop&q=80",
-    category: "Illustrated",
-    tags: ["graffiti", "street", "grunge"]
-  },
-  {
-    id: "7",
-    name: "Cyberpunk Dragon Tee",
-    description: "A traditional Eastern dragon silhouette merged with fiber-optic mesh scales and electric blue line highlights.",
-    price: 2499,
-    badge: "Bestseller",
-    image: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80",
-    category: "Illustrated",
-    tags: ["dragon", "cyber", "detailed"]
-  },
-  {
-    id: "8",
-    name: "Vintage Syntax Tee",
-    description: "Terminal code prompt executing visual system diagnostic dumps. Rendered in retro monochrome green-phosphor typography.",
-    price: 1399,
-    badge: "New Drop",
-    image: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80",
     category: "Typographic",
-    tags: ["vintage", "code", "minimal"]
+    tags: ["mindset", "minimal", "motivation"],
+    defaultColor: "#f5e6d3",
+    defaultView: "front",
+    printPosition: "front",
+    version: "Version 9"
+  },
+  {
+    id: "17",
+    name: "Drip Smile",
+    description: "Trippy cyber-acid yellow dripping smiley face print layered over abstract violet paint splatters on a premium black cotton tee.",
+    price: 1599,
+    badge: "New Drop",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 02_39_42 PM.png",
+    category: "Abstract",
+    tags: ["smiley", "acid", "splatter"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 10"
+  },
+  {
+    id: "18",
+    name: "Neon Future",
+    description: "Cyberpunk metropolis scene showing a lone wanderer amidst neon skyscraper arrays, featuring bold 'NEON FUTURE' and 'NO SIGNAL 2077' graphic overlays.",
+    price: 1899,
+    badge: "AI Generated",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 02_45_20 PM.png",
+    category: "Illustrated",
+    tags: ["cyberpunk", "metropolis", "neon"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 11"
+  },
+  {
+    id: "19",
+    name: "Shadow Within",
+    description: "Premium black hoodie with a high-fidelity split-face anime illustration, ruby-red eyes, and side Japanese typography translating to 'Become stronger in the shadows'.",
+    price: 3299,
+    badge: "Bestseller",
+    image: "/collection/ChatGPT Image Jun 30, 2026, 02_48_19 PM.png",
+    category: "Illustrated",
+    tags: ["anime", "streetwear", "ghoul"],
+    defaultColor: "#1a1a1a",
+    defaultView: "back",
+    printPosition: "back",
+    version: "Version 12"
   }
 ];
 
-export const CATEGORIES = ["All", "Abstract", "Typographic", "Minimal", "Illustrated"];
+export const CATEGORIES = ["All", "Minimal", "Streetwear", "Typographic", "Vintage", "Anime"];

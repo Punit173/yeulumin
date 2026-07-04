@@ -3,7 +3,10 @@
 import React, { useState } from "react";
 import { useViewerStore, DesignType, ViewType, SizeType } from "./useViewerStore";
 import { useCartStore } from "@/app/store/cartStore";
-import { ShoppingBag, Plus, Minus } from "lucide-react";
+import { ShoppingBag, Plus, Minus, FolderHeart } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/app/context/AuthContext";
+import { supabase, isSupabaseConfigured } from "@/app/lib/supabase";
 
 const COLOR_SWATCHES = [
   { name: "White", hex: "#ffffff" },
@@ -42,33 +45,110 @@ export default function ViewerControls() {
     view,
     size,
     quantity,
+    customTextureUrl,
+    customPrompt,
+    decalScale,
+    decalPosY,
+    decalPosX,
+    decalTarget,
     setColor,
     setDesign,
     setView,
     setSize,
     setQuantity,
+    setDecalScale,
+    setDecalPosY,
+    setDecalPosX,
+    setDecalTarget,
+    resetDecalPlacement,
   } = useViewerStore();
 
   const addItem = useCartStore((state) => state.addItem);
   const [addingToCart, setAddingToCart] = useState(false);
+  
+  const { user } = useAuth();
+  const router = useRouter();
+
+  const [savingToCollection, setSavingToCollection] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveToCollection = async () => {
+    if (!user) {
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/auth?redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      alert("Supabase configuration not found. Check environment variables.");
+      return;
+    }
+
+    setSavingToCollection(true);
+    setSaveSuccess(false);
+
+    try {
+      const designLabel = DESIGNS.find((d) => d.id === design)?.label || "Plain";
+      const name = prompt("Name your custom creation:", `Custom ${designLabel} Tee`) || `Custom ${designLabel} Tee`;
+
+      const { error } = await supabase.from("customizations").insert({
+        user_id: user.id,
+        name,
+        description: customPrompt || `A bespoke 3D customized t-shirt with ${designLabel} styling.`,
+        color,
+        design,
+        custom_texture_url: (design === "ai" && customTextureUrl) ? customTextureUrl : null,
+        custom_prompt: customPrompt,
+        decal_scale: decalScale,
+        decal_pos_x: decalPosX,
+        decal_pos_y: decalPosY,
+        decal_target: decalTarget,
+      });
+
+      if (error) throw error;
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error("Save failed:", err);
+      alert("Failed to save customization to your collection.");
+    } finally {
+      setSavingToCollection(false);
+    }
+  };
 
   const handleAddToCart = () => {
+    if (!user) {
+      const currentPath = window.location.pathname + window.location.search;
+      router.push(`/auth?redirect=${encodeURIComponent(currentPath)}`);
+      return;
+    }
+
     setAddingToCart(true);
 
-    // Create a mock representation image/label based on color/design
+    // Create a representation image/label based on color/design
     const designLabel = DESIGNS.find((d) => d.id === design)?.label || "Plain";
     const colorLabel = COLOR_SWATCHES.find((c) => c.hex === color)?.name || "Custom";
+
+    // Use generated Stability AI design if applicable, else fallback
+    const cartImage = (design === "ai" && customTextureUrl)
+      ? customTextureUrl
+      : `/logos/trimmed_yeulumin ai-05.png`;
+
+    const description = (design === "ai" && customTextureUrl)
+      ? `${colorLabel} fabric style, size ${size}. Customized via Stability AI (Scale: ${(decalScale * 100).toFixed(0)}%, Position Y: ${decalPosY.toFixed(2)}).`
+      : `${colorLabel} fabric style, size ${size}. Procedural 3D studio layout (Scale: ${(decalScale * 100).toFixed(0)}%, Position Y: ${decalPosY.toFixed(2)}).`;
 
     addItem({
       id: `configured-${Date.now()}`,
       name: `Yeulumin ${designLabel} Tee`,
-      description: `${colorLabel} fabric style, size ${size}. Procedural 3D studio layout.`,
+      description,
       price: 999,
       quantity,
-      image: `/logos/trimmed_yeulumin ai-05.png`, // Monogram logo as primary custom item thumbnail
+      image: cartImage,
       size,
       color,
       style: designLabel,
+      prompt: (design === "ai" && customPrompt) ? customPrompt : undefined,
     });
 
     setTimeout(() => {
@@ -136,6 +216,97 @@ export default function ViewerControls() {
             })}
           </div>
         </div>
+
+        {/* ADJUST PRINT (only show if design is not 'none') */}
+        {design !== "none" && (
+          <div className="flex flex-col gap-3 bg-[#161616]/30 border border-[#222]/40 rounded-xl p-3 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-[#222] pb-1.5">
+              <label className="text-[10px] tracking-[2px] text-[#00FFB2] uppercase font-bold">
+                Adjust Print
+              </label>
+              <button
+                type="button"
+                onClick={resetDecalPlacement}
+                className="text-[8px] font-mono text-neutral-500 hover:text-white uppercase tracking-wider cursor-pointer"
+              >
+                Reset
+              </button>
+            </div>
+            
+            {/* Print Placement */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[8px] font-mono text-[#666] uppercase tracking-wider">Placement</span>
+              <div className="flex bg-[#111] p-0.5 rounded-lg border border-[#222]">
+                {(["front", "back"] as const).map((target) => {
+                  const isActive = decalTarget === target;
+                  return (
+                    <button
+                      key={target}
+                      type="button"
+                      onClick={() => setDecalTarget(target)}
+                      className={`flex-1 py-1 text-[9px] font-bold uppercase rounded-md cursor-pointer transition-all duration-200 ${
+                        isActive ? "bg-[#00FFB2] text-black" : "text-[#888] hover:text-white"
+                      }`}
+                    >
+                      {target}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Scale Slider */}
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between text-[8px] font-mono text-neutral-500">
+                <span>Scale</span>
+                <span className="text-neutral-300">{(decalScale * 100).toFixed(0)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="0.6"
+                step="0.01"
+                value={decalScale}
+                onChange={(e) => setDecalScale(parseFloat(e.target.value))}
+                className="w-full accent-[#00FFB2] cursor-pointer h-1 bg-[#222] rounded-lg appearance-none"
+              />
+            </div>
+
+            {/* Vertical Slider */}
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between text-[8px] font-mono text-neutral-500">
+                <span>Vertical Pos</span>
+                <span className="text-neutral-300">{decalPosY.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min="-0.1"
+                max="0.2"
+                step="0.01"
+                value={decalPosY}
+                onChange={(e) => setDecalPosY(parseFloat(e.target.value))}
+                className="w-full accent-[#00FFB2] cursor-pointer h-1 bg-[#222] rounded-lg appearance-none"
+              />
+            </div>
+
+            {/* Horizontal Slider */}
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between text-[8px] font-mono text-neutral-500">
+                <span>Horizontal Pos</span>
+                <span className="text-neutral-300">{decalPosX.toFixed(2)}</span>
+              </div>
+              <input
+                type="range"
+                min="-0.1"
+                max="0.1"
+                step="0.01"
+                value={decalPosX}
+                onChange={(e) => setDecalPosX(parseFloat(e.target.value))}
+                className="w-full accent-[#00FFB2] cursor-pointer h-1 bg-[#222] rounded-lg appearance-none"
+              />
+            </div>
+          </div>
+        )}
 
         {/* 4. VIEW */}
         <div className="flex flex-col gap-2">
@@ -211,7 +382,7 @@ export default function ViewerControls() {
       </div>
 
       {/* FOOTER CTA SECTION */}
-      <div className="p-4 border-t border-[#222] bg-[#161616]/40 flex flex-col gap-3">
+      <div className="p-4 border-t border-[#222] bg-[#161616]/40 flex flex-col gap-3.5">
         {/* 7. PRICE */}
         <div className="flex items-baseline gap-1.5">
           <span className="text-[20px] font-black text-[#00FFB2] font-mono">
@@ -219,6 +390,16 @@ export default function ViewerControls() {
           </span>
           <span className="text-[10px] text-[#666] uppercase">/ {quantity} piece{quantity > 1 ? 's' : ''}</span>
         </div>
+
+        {/* 7.5. SAVE TO COLLECTION */}
+        <button
+          onClick={handleSaveToCollection}
+          disabled={savingToCollection}
+          className="w-full py-2.5 rounded-lg border border-neutral-800 hover:border-violet/40 hover:text-violet-300 bg-[#0A0A0A]/40 text-xs font-semibold uppercase tracking-wider text-neutral-400 flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 disabled:opacity-50"
+        >
+          <FolderHeart className="h-4 w-4" />
+          <span>{savingToCollection ? "Saving..." : saveSuccess ? "Saved!" : "Save to Collection"}</span>
+        </button>
 
         {/* 8. ADD TO CART */}
         <button

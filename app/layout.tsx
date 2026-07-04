@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Orbitron, Sora } from "next/font/google";
+import { AuthProvider } from "./context/AuthContext";
 import "./globals.css";
 
 const orbitron = Orbitron({
@@ -34,7 +35,9 @@ export default function RootLayout({
       className={`${orbitron.variable} ${sora.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-[#0A0A0A] text-[#f5f5f5] antialiased">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

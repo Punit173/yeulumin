@@ -128,7 +128,7 @@ export default function TshirtModel({
   scale = 1.1,
   autoRotateSpeed = 1.0,
 }: TshirtModelProps) {
-  const { color, design, view } = useViewerStore();
+  const { color, design, view, customTextureUrl, decalScale, decalPosY, decalPosX, decalTarget } = useViewerStore();
   const meshRef = useRef<THREE.Mesh>(null);
   const controlsRef = useRef<any>(null);
 
@@ -154,6 +154,11 @@ export default function TshirtModel({
   const [canvasTexture, setCanvasTexture] = useState<THREE.CanvasTexture | null>(null);
 
   useEffect(() => {
+    // If we have a custom generated AI image, we don't need the procedural CanvasTexture
+    if (design === "ai" && customTextureUrl) {
+      setCanvasTexture(null);
+      return;
+    }
     const newTex = generateDesignTexture(design);
     setCanvasTexture(newTex);
 
@@ -162,7 +167,7 @@ export default function TshirtModel({
         newTex.dispose();
       }
     };
-  }, [design]);
+  }, [design, customTextureUrl]);
 
   // Load real logo image texture for the 'logo' design
   const [logoTexture, setLogoTexture] = useState<THREE.Texture | null>(null);
@@ -181,6 +186,24 @@ export default function TshirtModel({
       tex.dispose();
     };
   }, [design]);
+
+  // Load Stability AI generated texture when design === "ai" and customTextureUrl is set
+  const [customTexture, setCustomTexture] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    if (design !== "ai" || !customTextureUrl) {
+      setCustomTexture(null);
+      return;
+    }
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load(customTextureUrl, (loaded) => {
+      loaded.needsUpdate = true;
+      setCustomTexture(loaded);
+    });
+    return () => {
+      tex.dispose();
+    };
+  }, [design, customTextureUrl]);
 
   // State to manage autoRotate toggle on interaction
   const [autoRotate, setAutoRotate] = useState(true);
@@ -268,6 +291,11 @@ export default function TshirtModel({
     }
   });
 
+  const isBack = decalTarget === "back";
+  const decalZ = isBack ? -0.125 : 0.125; // slightly increase offset to prevent z-fighting on back
+  const decalRotY = isBack ? Math.PI : 0;
+  const adjustedPosX = isBack ? -decalPosX : decalPosX;
+
   return (
     <>
       <group position={[0, -0.55, 0]} scale={[scale, scale, scale]}>
@@ -281,9 +309,9 @@ export default function TshirtModel({
           {canvasTexture && (
             <Decal
               mesh={meshRef as any}
-              position={[0, 0.05, 0.12]}
-              rotation={[0, 0, 0]}
-              scale={[0.4, 0.4, 0.4]}
+              position={[adjustedPosX, decalPosY, decalZ]}
+              rotation={[0, decalRotY, 0]}
+              scale={[decalScale, decalScale, decalScale]}
               map={canvasTexture}
               polygonOffsetFactor={-1}
             />
@@ -291,10 +319,20 @@ export default function TshirtModel({
           {logoTexture && (
             <Decal
               mesh={meshRef as any}
-              position={[0, 0.05, 0.12]}
-              rotation={[0, 0, 0]}
-              scale={[0.3, 0.3, 0.3]}
+              position={[adjustedPosX, decalPosY, decalZ]}
+              rotation={[0, decalRotY, 0]}
+              scale={[decalScale, decalScale, decalScale]}
               map={logoTexture}
+              polygonOffsetFactor={-1}
+            />
+          )}
+          {customTexture && (
+            <Decal
+              mesh={meshRef as any}
+              position={[adjustedPosX, decalPosY, decalZ]}
+              rotation={[0, decalRotY, 0]}
+              scale={[decalScale, decalScale, decalScale]}
+              map={customTexture}
               polygonOffsetFactor={-1}
             />
           )}

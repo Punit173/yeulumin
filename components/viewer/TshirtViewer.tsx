@@ -30,7 +30,7 @@ export default function TshirtViewer({
   cameraDistance = 4.2,
 }: TshirtViewerProps) {
   return (
-    <div className="relative w-full h-full bg-white cursor-grab active:cursor-grabbing">
+    <div className="relative w-full h-full bg-transparent cursor-grab active:cursor-grabbing">
       <Canvas
         shadows
         gl={{ antialias: true }}
