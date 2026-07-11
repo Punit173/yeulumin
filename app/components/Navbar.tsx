@@ -30,9 +30,10 @@ export default function Navbar() {
   ];
 
   const isHome = pathname === "/";
+  const hideMobileHeader = pathname === "/products" || pathname === "/collection" || pathname === "/profile";
 
   return (
-    <header className={`sticky top-0 z-40 w-full transition-all duration-300 ${isHome ? "bg-transparent border-none" : "border-b border-neutral-200/60 bg-white/80 backdrop-blur-md"}`}>
+    <header className={`sticky top-0 z-40 w-full transition-all duration-300 ${hideMobileHeader ? "hidden md:block" : "block"} ${isHome ? "bg-transparent border-none" : "border-b border-neutral-200/60 bg-white/80 backdrop-blur-md"}`}>
       <div className="mx-auto flex max-w-7xl h-20 items-center justify-between px-4 sm:px-6 lg:px-8">
         
         {/* Mobile Menu Button (Hamburger Toggle) - Shown on Left on Mobile */}

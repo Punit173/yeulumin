@@ -282,13 +282,6 @@ export default function ProductsPage() {
                           />
                           
                           <div className="absolute right-0 bottom-8 w-44 rounded-xl bg-white border border-neutral-200/80 p-1.5 shadow-xl z-40 flex flex-col gap-0.5 animate-fadeIn">
-                            <Link
-                              href={`/customize?preset=${product.id}`}
-                              className="px-3 py-2 text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50 hover:text-black rounded-lg text-left flex items-center gap-2"
-                            >
-                              <Sparkles className="h-3.5 w-3.5" />
-                              <span>Remix in Lab</span>
-                            </Link>
                             <button
                               onClick={() => handleAddToCart(product)}
                               className="px-3 py-2 text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50 hover:text-black rounded-lg text-left flex items-center gap-2 cursor-pointer w-full"

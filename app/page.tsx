@@ -263,15 +263,7 @@ export default function HomePage() {
                           className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-103"
                         />
 
-                        {/* Interactive hover overlay */}
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4">
-                          <Link
-                            href={`/customize?preset=${product.id}`}
-                            className="px-6 py-2.5 bg-white text-black text-xs font-bold rounded-lg shadow hover:bg-neutral-100 transition-colors uppercase tracking-wider"
-                          >
-                            Remix in Studio
-                          </Link>
-                        </div>
+
                       </div>
 
                       {/* Detail contents */}
@@ -323,10 +315,18 @@ export default function HomePage() {
       {/* ─── 4. FLOATING ACTION BUTTON ─── */}
       <Link
         href="/customize"
-        className="fixed bottom-24 right-6 z-40 h-14 w-14 rounded-full bg-blue-600 text-white shadow-xl hover:bg-blue-700 hover:scale-105 transition-all flex items-center justify-center md:bottom-6"
+        className="fixed bottom-24 right-6 z-40 h-16 w-16 hover:scale-105 active:scale-95 transition-all flex items-center justify-center md:bottom-6 cursor-pointer bg-cover bg-center rounded-full overflow-hidden shadow-2xl group"
+        style={{
+          backgroundImage: "url('/gen_button/FLOAT%20BUTTON%20%233BA6FC%200_%2C%20%23369CFD%2050_%2C%20%23307AFB%20100_.png')",
+        }}
         title="Open Design Lab"
       >
-        <Sparkles className="h-6 w-6 fill-current" />
+        <div className="absolute inset-0 bg-black/25 group-hover:bg-black/10 transition-colors" />
+        <img
+          src="/gen_button/FLOATING%20BUTTON.png"
+          alt="Open Design Lab"
+          className="w-full h-full object-contain filter drop-shadow-xl relative z-10"
+        />
       </Link>
 
       {/* ─── 5. MOBILE BOTTOM TAB NAVIGATION ─── */}

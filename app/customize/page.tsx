@@ -51,6 +51,26 @@ const COLOR_SWATCHES = [
   { name: "Orange", hex: "#ea580c" },
 ];
 
+const PROMPT_SUGGESTIONS = [
+  "Create a cyberpunk wolf with neon blue accents.",
+  "A Japanese cherry blossom dragon in watercolor style.",
+  "Geometric mandala pattern with gold and purple tones.",
+  "Abstract streetwear graffiti art with bold splashes.",
+];
+
+function useRotatingPlaceholder() {
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPlaceholderIdx((prev) => (prev + 1) % PROMPT_SUGGESTIONS.length);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return { placeholderIdx, setPlaceholderIdx, placeholder: PROMPT_SUGGESTIONS[placeholderIdx] };
+}
+
 export default function DesignLabPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -84,8 +104,11 @@ export default function DesignLabPage() {
     resetDecalPlacement,
   } = useViewerStore();
 
+  // Rotating prompt placeholder hook
+  const rotatingPlaceholder = useRotatingPlaceholder();
+
   // Local state controls
-  const [prompt, setPrompt] = useState("Create a cyberpunk wolf with neon blue accents.");
+  const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTool, setActiveTool] = useState<"color" | "garment" | "placement" | "size" | null>(null);
   const [selectedTag, setSelectedTag] = useState("Cyberpunk");
@@ -338,59 +361,78 @@ export default function DesignLabPage() {
         </div>
 
         {/* ─── AI GENERATOR INPUT CONSOLE (FLOATING CARD) ─── */}
-        <section className="w-full max-w-xl bg-white border border-neutral-200/80 rounded-3xl p-5 shadow-lg z-20 flex flex-col gap-4 relative">
+        <section className="w-full max-w-xl bg-white border border-neutral-200/80 rounded-3xl p-5 shadow-lg z-20 flex flex-col gap-3 relative">
           
-          {/* Prompt text area */}
-          <div className="flex flex-col gap-1.5 text-left">
-            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-700">
-              <Sparkles className="h-4 w-4 text-blue-600 animate-pulse" />
-              <span>Create with Neural Art synthesis</span>
+          {/* Prompt input with rotating placeholder carousel */}
+          <div className="relative">
+            <div className="flex items-start gap-2.5">
+              <Sparkles className="h-5 w-5 text-[#3BA6FC] flex-shrink-0 mt-0.5" />
+              <input
+                type="text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                onFocus={() => { if (PROMPT_SUGGESTIONS.includes(prompt)) setPrompt(""); }}
+                disabled={isGenerating}
+                placeholder={rotatingPlaceholder.placeholder}
+                className="w-full bg-transparent text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none leading-relaxed"
+              />
             </div>
-            
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              disabled={isGenerating}
-              placeholder="Describe your graphic ideas... e.g. A cybernetic dragon in red & blue neon..."
-              className="w-full mt-1 bg-transparent text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none resize-none h-16 leading-relaxed"
-            />
+
+            {/* Dot indicators */}
+            <div className="flex items-center justify-center gap-1.5 mt-2.5">
+              {PROMPT_SUGGESTIONS.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    rotatingPlaceholder.setPlaceholderIdx(idx);
+                    setPrompt(PROMPT_SUGGESTIONS[idx]);
+                  }}
+                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                    idx === rotatingPlaceholder.placeholderIdx
+                      ? "w-2 bg-[#3BA6FC]"
+                      : "w-2 bg-[#3BA6FC]/30 hover:bg-[#3BA6FC]/50"
+                  }`}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Lower controls bar */}
           <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
             
             {/* Input helpers */}
-            <div className="flex items-center gap-1.5 text-neutral-400">
+            <div className="flex items-center gap-1 text-neutral-500">
               <button
                 type="button"
-                className="p-2 rounded-full hover:bg-neutral-50 hover:text-neutral-700 transition-colors cursor-pointer"
+                className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                 title="Voice Input"
               >
-                <Mic className="h-4.5 w-4.5" />
+                <Mic className="h-5 w-5" />
               </button>
               <button
                 type="button"
-                className="p-2 rounded-full hover:bg-neutral-50 hover:text-neutral-700 transition-colors cursor-pointer"
+                className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                 title="Upload Reference Image"
               >
-                <ImageIcon className="h-4.5 w-4.5" />
+                <ImageIcon className="h-5 w-5" />
               </button>
               <button
                 type="button"
-                className="p-2 rounded-full hover:bg-neutral-50 hover:text-neutral-700 transition-colors cursor-pointer"
+                className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                 title="Refine Prompt"
               >
-                <Wand2 className="h-4.5 w-4.5" />
+                <Wand2 className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Synthesizer Generate button */}
+            {/* Generate button - pill style matching reference */}
             <button
               onClick={handleGenerate}
               disabled={isGenerating || !prompt.trim()}
-              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow hover:shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40"
+              className="px-6 py-3 bg-gradient-to-r from-[#3BA6FC] via-[#369CFD] to-[#307AFB] text-white text-sm font-bold rounded-full shadow-lg shadow-blue-400/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-103 active:scale-97 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40"
             >
-              <Sparkles className="h-3.5 w-3.5 fill-current" />
+              <Sparkles className="h-4 w-4 fill-current" />
               <span>{isGenerating ? "Synthesizing..." : "Generate"}</span>
             </button>
 
