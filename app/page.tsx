@@ -325,7 +325,7 @@ export default function HomePage() {
         <img
           src="/gen_button/FLOATING%20BUTTON.png"
           alt="Open Design Lab"
-          className="w-full h-full object-contain filter drop-shadow-xl relative z-10"
+          className="w-full h-full object-contain filter drop-shadow-xl relative z-10 scale-[1.35] transition-transform duration-300 group-hover:scale-[1.45]"
         />
       </Link>
 
