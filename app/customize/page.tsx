@@ -30,6 +30,7 @@ import {
   Undo as UndoIcon,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   FolderHeart
 } from "lucide-react";
 import GrainOverlay from "../components/GrainOverlay";
@@ -114,6 +115,7 @@ export default function DesignLabPage() {
   const [selectedTag, setSelectedTag] = useState("Cyberpunk");
   const [autoRotate, setAutoRotate] = useState(true);
   const [zoomLevel, setZoomLevel] = useState("wide"); // wide, close
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [wishlistSuccess, setWishlistSuccess] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
 
@@ -307,53 +309,68 @@ export default function DesignLabPage() {
           </div>
 
           {/* LEFT VERTICAL FLOATING CAMERA CONTROL MODULE */}
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2">
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col">
             
-            {/* View eye-badge header */}
-            <div className="bg-blue-600 text-white rounded-t-xl px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20">
+            {/* View toggle button */}
+            <button
+              onClick={() => setViewMenuOpen(!viewMenuOpen)}
+              className="bg-blue-600 text-white rounded-xl px-2.5 py-2.5 sm:px-3 sm:py-2 text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/20 cursor-pointer hover:bg-blue-700 transition-colors"
+              style={{ borderBottomLeftRadius: viewMenuOpen ? 0 : undefined, borderBottomRightRadius: viewMenuOpen ? 0 : undefined }}
+              title="Toggle View Controls"
+            >
               <Eye className="h-3.5 w-3.5" />
-              <span>View</span>
-            </div>
+              <span className="hidden sm:inline">View</span>
+              <ChevronDown className={`hidden sm:block h-3 w-3 transition-transform duration-300 ${viewMenuOpen ? "rotate-180" : ""}`} />
+            </button>
 
-            {/* Controller card list */}
-            <div className="bg-white border border-neutral-200/80 rounded-b-xl p-2.5 flex flex-col gap-3 shadow-md">
-              <button
-                onClick={() => setAutoRotate(!autoRotate)}
-                className={`flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer ${
-                  autoRotate ? "text-blue-600 font-bold" : "text-neutral-500"
-                }`}
-                title="Toggle Rotation"
-              >
-                <RefreshCw className={`h-4.5 w-4.5 ${autoRotate ? "animate-spin-slow" : ""}`} />
-                <span className="text-[8px] font-mono uppercase tracking-wider">Rotate</span>
-              </button>
+            {/* Collapsible controller card list */}
+            <div
+              className="bg-white border border-t-0 border-neutral-200/80 rounded-b-xl shadow-md overflow-hidden transition-all duration-300 ease-in-out"
+              style={{
+                maxHeight: viewMenuOpen ? "220px" : "0px",
+                opacity: viewMenuOpen ? 1 : 0,
+                padding: viewMenuOpen ? "10px" : "0px 10px",
+              }}
+            >
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => setAutoRotate(!autoRotate)}
+                  className={`flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer ${
+                    autoRotate ? "text-blue-600 font-bold" : "text-neutral-500"
+                  }`}
+                  title="Toggle Rotation"
+                >
+                  <RefreshCw className={`h-4.5 w-4.5 ${autoRotate ? "animate-spin-slow" : ""}`} />
+                  <span className="text-[8px] font-mono uppercase tracking-wider">Rotate</span>
+                </button>
 
-              <button
-                onClick={() => setZoomLevel(zoomLevel === "wide" ? "close" : "wide")}
-                className={`flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer ${
-                  zoomLevel === "close" ? "text-blue-600 font-bold" : "text-neutral-500"
-                }`}
-                title="Toggle Zoom"
-              >
-                <ZoomIn className="h-4.5 w-4.5" />
-                <span className="text-[8px] font-mono uppercase tracking-wider">Zoom</span>
-              </button>
+                <button
+                  onClick={() => setZoomLevel(zoomLevel === "wide" ? "close" : "wide")}
+                  className={`flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer ${
+                    zoomLevel === "close" ? "text-blue-600 font-bold" : "text-neutral-500"
+                  }`}
+                  title="Toggle Zoom"
+                >
+                  <ZoomIn className="h-4.5 w-4.5" />
+                  <span className="text-[8px] font-mono uppercase tracking-wider">Zoom</span>
+                </button>
 
-              <button
-                onClick={() => {
-                  setColor("#ffffff");
-                  setCustomTextureUrl(null);
-                  setDesign("none");
-                  resetDecalPlacement();
-                  setAutoRotate(true);
-                  setZoomLevel("wide");
-                }}
-                className="flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-neutral-50 transition-colors text-neutral-500 cursor-pointer"
-                title="Reset Workspace"
-              >
-                <Maximize2 className="h-4.5 w-4.5" />
-                <span className="text-[8px] font-mono uppercase tracking-wider">Reset</span>
-              </button>
+                <button
+                  onClick={() => {
+                    setColor("#ffffff");
+                    setCustomTextureUrl(null);
+                    setDesign("none");
+                    resetDecalPlacement();
+                    setAutoRotate(true);
+                    setZoomLevel("wide");
+                  }}
+                  className="flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-neutral-50 transition-colors text-neutral-500 cursor-pointer"
+                  title="Reset Workspace"
+                >
+                  <Maximize2 className="h-4.5 w-4.5" />
+                  <span className="text-[8px] font-mono uppercase tracking-wider">Reset</span>
+                </button>
+              </div>
             </div>
 
           </div>
@@ -361,25 +378,31 @@ export default function DesignLabPage() {
         </div>
 
         {/* ─── AI GENERATOR INPUT CONSOLE (FLOATING CARD) ─── */}
-        <section className="w-full max-w-xl bg-white border border-neutral-200/80 rounded-3xl p-5 shadow-lg z-20 flex flex-col gap-3 relative">
+        <section className="w-full max-w-xl bg-white border border-neutral-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-lg z-20 flex flex-col gap-2.5 sm:gap-3 relative mx-auto">
           
           {/* Prompt input with rotating placeholder carousel */}
           <div className="relative">
-            <div className="flex items-start gap-2.5">
-              <Sparkles className="h-5 w-5 text-[#3BA6FC] flex-shrink-0 mt-0.5" />
-              <input
-                type="text"
+            <div className="flex items-start gap-2">
+              <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-[#3BA6FC] flex-shrink-0 mt-0.5" />
+              <textarea
+                rows={1}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  // Auto-resize textarea
+                  e.target.style.height = 'auto';
+                  e.target.style.height = e.target.scrollHeight + 'px';
+                }}
                 onFocus={() => { if (PROMPT_SUGGESTIONS.includes(prompt)) setPrompt(""); }}
                 disabled={isGenerating}
                 placeholder={rotatingPlaceholder.placeholder}
-                className="w-full bg-transparent text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none leading-relaxed"
+                className="w-full bg-transparent text-xs sm:text-sm text-neutral-800 placeholder-neutral-400 focus:outline-none leading-relaxed resize-none overflow-hidden"
+                style={{ minHeight: '22px' }}
               />
             </div>
 
             {/* Dot indicators */}
-            <div className="flex items-center justify-center gap-1.5 mt-2.5">
+            <div className="flex items-center justify-center gap-1.5 mt-2">
               {PROMPT_SUGGESTIONS.map((_, idx) => (
                 <button
                   key={idx}
@@ -388,10 +411,10 @@ export default function DesignLabPage() {
                     rotatingPlaceholder.setPlaceholderIdx(idx);
                     setPrompt(PROMPT_SUGGESTIONS[idx]);
                   }}
-                  className={`h-2 rounded-full transition-all cursor-pointer ${
+                  className={`h-1.5 sm:h-2 rounded-full transition-all cursor-pointer ${
                     idx === rotatingPlaceholder.placeholderIdx
-                      ? "w-2 bg-[#3BA6FC]"
-                      : "w-2 bg-[#3BA6FC]/30 hover:bg-[#3BA6FC]/50"
+                      ? "w-1.5 sm:w-2 bg-[#3BA6FC]"
+                      : "w-1.5 sm:w-2 bg-[#3BA6FC]/30 hover:bg-[#3BA6FC]/50"
                   }`}
                 />
               ))}
@@ -399,40 +422,40 @@ export default function DesignLabPage() {
           </div>
 
           {/* Lower controls bar */}
-          <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 sm:pt-3">
             
             {/* Input helpers */}
             <div className="flex items-center gap-1 text-neutral-500">
               <button
                 type="button"
-                className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                 title="Voice Input"
               >
-                <Mic className="h-5 w-5" />
+                <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               <button
                 type="button"
-                className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                 title="Upload Reference Image"
               >
-                <ImageIcon className="h-5 w-5" />
+                <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
               <button
                 type="button"
-                className="p-2.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
                 title="Refine Prompt"
               >
-                <Wand2 className="h-5 w-5" />
+                <Wand2 className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
 
-            {/* Generate button - pill style matching reference */}
+            {/* Generate button - compact on mobile, pill on desktop */}
             <button
               onClick={handleGenerate}
               disabled={isGenerating || !prompt.trim()}
-              className="px-6 py-3 bg-gradient-to-r from-[#3BA6FC] via-[#369CFD] to-[#307AFB] text-white text-sm font-bold rounded-full shadow-lg shadow-blue-400/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-103 active:scale-97 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-40"
+              className="group btn-shine-sweep relative overflow-hidden px-4 py-2.5 sm:px-6 sm:py-3 bg-gradient-to-r from-[#3BA6FC] via-[#369CFD] to-[#307AFB] bg-[length:200%_auto] hover:bg-right text-white text-xs sm:text-sm font-bold rounded-full shadow-lg shadow-blue-400/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center gap-1.5 sm:gap-2 cursor-pointer disabled:opacity-40"
             >
-              <Sparkles className="h-4 w-4 fill-current" />
+              <Sparkles className={`h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current transition-all duration-300 ${isGenerating ? "animate-spin" : "group-hover:scale-115 group-hover:rotate-12"}`} />
               <span>{isGenerating ? "Synthesizing..." : "Generate"}</span>
             </button>
 

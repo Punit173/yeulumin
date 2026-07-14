@@ -33,6 +33,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${orbitron.variable} ${sora.variable} h-full antialiased dark`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-[#0A0A0A] text-[#f5f5f5] antialiased">
         <AuthProvider>

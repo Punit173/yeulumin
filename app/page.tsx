@@ -315,7 +315,7 @@ export default function HomePage() {
       {/* ─── 4. FLOATING ACTION BUTTON ─── */}
       <Link
         href="/customize"
-        className="fixed bottom-24 right-6 z-40 h-16 w-16 hover:scale-105 active:scale-95 transition-all flex items-center justify-center md:bottom-6 cursor-pointer bg-cover bg-center rounded-full overflow-hidden shadow-2xl group"
+        className="fixed bottom-24 right-6 z-40 h-12 w-12 md:h-16 md:w-16 hover:scale-105 active:scale-95 transition-all flex items-center justify-center md:bottom-6 cursor-pointer bg-cover bg-center rounded-full overflow-hidden shadow-2xl group btn-shine-sweep btn-glow-pulse"
         style={{
           backgroundImage: "url('/gen_button/FLOAT%20BUTTON%20%233BA6FC%200_%2C%20%23369CFD%2050_%2C%20%23307AFB%20100_.png')",
         }}

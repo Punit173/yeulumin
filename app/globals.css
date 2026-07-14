@@ -98,3 +98,53 @@ body {
   background: #00FFB2;
   color: #0A0A0A;
 }
+
+/* Premium shine-sweep continuous animation */
+@keyframes shine-sweep {
+  0% {
+    left: -150%;
+  }
+  40% {
+    left: 150%;
+  }
+  100% {
+    left: 150%;
+  }
+}
+
+.btn-shine-sweep {
+  /* Assumes the target element has a positioning class (relative/fixed/absolute) and overflow-hidden */
+}
+
+.btn-shine-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: skewX(-25deg);
+  animation: shine-sweep 3s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes glow-shadow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 166, 252, 0.6), 0 10px 25px rgba(59, 166, 252, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(59, 166, 252, 0), 0 15px 35px rgba(59, 166, 252, 0.6);
+  }
+}
+
+.btn-glow-pulse {
+  animation: glow-shadow-pulse 2s infinite ease-in-out;
+}
+
+
