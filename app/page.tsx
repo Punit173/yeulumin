@@ -159,7 +159,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── 2. CURRENT OFFERS BANNER ─── */}
-      <section className="w-full px-4 sm:px-6 md:px-0 my-10 md:my-0">
+      <section className="w-full px-4 sm:px-6 md:px-0 my-4 sm:my-10 md:my-0">
         <Link
           href="/products"
           className="block relative w-full aspect-[1706/922] rounded-2xl md:rounded-none overflow-hidden shadow-md md:shadow-none group border border-neutral-200/40 md:border-none"
@@ -175,7 +175,7 @@ export default function HomePage() {
       <main className="flex-grow mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12">
 
         {/* ─── 3. PRE-DEFINED STYLES GRID SECTION ─── */}
-        <section className="my-12">
+        <section className="my-4 sm:my-12">
           
           {/* Header titles */}
           <div className="flex justify-between items-end mb-8">
