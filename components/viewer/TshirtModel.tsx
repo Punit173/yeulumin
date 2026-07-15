@@ -6,9 +6,10 @@ import { useGLTF, Decal, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { useViewerStore } from "./useViewerStore";
 
-// Preload the GLB model
+// Preload the GLB models
 useGLTF.preload("/models/tshirt.glb");
 useGLTF.preload("/models/premium_eco_hoodie.glb");
+useGLTF.preload("/models/oversized_t-shirt.glb");
 
 // Helper function to generate design textures on a 512x512 canvas
 function generateDesignTexture(designId: string): THREE.CanvasTexture | null {
@@ -144,6 +145,8 @@ export default function TshirtModel({
   const controlsRef = useRef<any>(null);
 
   const isHoodie = garmentType === "hoodie";
+  const isOversized = garmentType === "oversized";
+  const useSceneRenderer = isHoodie || isOversized; // multi-mesh models use <primitive object={scene}>
 
   // Access three.js canvas size
   const { size: canvasSize } = useThree();
@@ -160,9 +163,12 @@ export default function TshirtModel({
   }, [scale, canvasSize.width, canvasSize.height]);
 
   // Load the GLTF/GLB model
-  const { nodes, materials, scene } = useGLTF(
-    isHoodie ? "/models/premium_eco_hoodie.glb" : "/models/tshirt.glb"
-  ) as any;
+  const glbPath = isHoodie
+    ? "/models/premium_eco_hoodie.glb"
+    : isOversized
+      ? "/models/oversized_t-shirt.glb"
+      : "/models/tshirt.glb";
+  const { nodes, materials, scene } = useGLTF(glbPath) as any;
 
   // Locate the T-shirt mesh dynamically
   const meshKey = useMemo(() => {
@@ -172,15 +178,25 @@ export default function TshirtModel({
 
   // Apply fabric color to the material dynamically when color changes
   useEffect(() => {
-    if (isHoodie) {
-      // Apply color to hoodie fabrics (Material 0 "FABRIC_3_2603")
+    if (useSceneRenderer) {
+      // Apply color to all fabric materials in scene-based models (hoodie + oversized)
       Object.values(materials).forEach((mat: any) => {
         if (mat) {
-          if (mat.name.includes("FABRIC") || mat.name.includes("Material.002")) {
+          if (isHoodie) {
+            // Hoodie: only color FABRIC and Material.002
+            if (mat.name.includes("FABRIC") || mat.name.includes("Material.002")) {
+              mat.color.set(color);
+              mat.aoMap = null;
+              mat.map = null;
+              mat.roughness = 0.65;
+              mat.needsUpdate = true;
+            }
+          } else {
+            // Oversized: single material "Material.001"
             mat.color.set(color);
-            mat.aoMap = null; // Clear ambient occlusion maps that cause black backside
-            mat.map = null; // Clear base color textures to allow solid flat colors
-            mat.roughness = 0.65;
+            mat.aoMap = null;
+            mat.map = null;
+            mat.roughness = 0.6;
             mat.needsUpdate = true;
           }
         }
@@ -188,13 +204,12 @@ export default function TshirtModel({
     } else {
       if (shirtMeshNode && shirtMeshNode.material) {
         shirtMeshNode.material.color.set(color);
-        // Remove ambient occlusion map to prevent the backside of the shirt from rendering black
         shirtMeshNode.material.aoMap = null;
         shirtMeshNode.material.roughness = 0.6;
         shirtMeshNode.material.needsUpdate = true;
       }
     }
-  }, [color, shirtMeshNode, materials, isHoodie]);
+  }, [color, shirtMeshNode, materials, useSceneRenderer, isHoodie]);
 
   const hoodieMeshRef = useRef<THREE.Mesh | null>(null);
 
@@ -206,9 +221,9 @@ export default function TshirtModel({
     }
   }, [isHoodie, nodes]);
 
-  // Center the hoodie model dynamically on load to prevent it from floating off-center
+  // Center scene-based models dynamically on load to prevent floating off-center
   useEffect(() => {
-    if (isHoodie && scene) {
+    if (useSceneRenderer && scene) {
       // Reset only position (NOT rotation/scale — those contain critical axis-swap matrices)
       scene.position.set(0, 0, 0);
       scene.updateMatrixWorld(true);
@@ -221,7 +236,7 @@ export default function TshirtModel({
       scene.position.set(-center.x, -center.y, -center.z);
       scene.updateMatrixWorld(true);
     }
-  }, [isHoodie, scene]);
+  }, [useSceneRenderer, scene]);
 
   // Generate decal canvas texture (for non-logo designs)
   const [canvasTexture, setCanvasTexture] = useState<THREE.CanvasTexture | null>(null);
@@ -371,7 +386,7 @@ export default function TshirtModel({
 
   return (
     <>
-      {isHoodie ? (
+      {useSceneRenderer ? (
         <>
           <group position={[0, -0.55, 0]} scale={[responsiveScale, responsiveScale, responsiveScale]}>
             <primitive object={scene} />

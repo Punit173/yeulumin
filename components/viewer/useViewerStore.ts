@@ -17,7 +17,7 @@ export interface ViewerState {
   decalPosY: number;
   decalPosX: number;
   decalTarget: "front" | "back";
-  garmentType: "tshirt" | "hoodie";
+  garmentType: "tshirt" | "hoodie" | "oversized";
   setColor: (c: string) => void;
   setDesign: (d: DesignType) => void;
   setView: (v: ViewType) => void;
@@ -30,7 +30,7 @@ export interface ViewerState {
   setDecalPosY: (y: number) => void;
   setDecalPosX: (x: number) => void;
   setDecalTarget: (t: "front" | "back") => void;
-  setGarmentType: (t: "tshirt" | "hoodie") => void;
+  setGarmentType: (t: "tshirt" | "hoodie" | "oversized") => void;
   resetDecalPlacement: () => void;
 }
 

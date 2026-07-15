@@ -128,8 +128,8 @@ export default function DesignLabPage() {
     const presetId = searchParams.get("preset");
     const garmentParam = searchParams.get("garment");
 
-    if (garmentParam === "hoodie" || garmentParam === "tshirt") {
-      setGarmentType(garmentParam as "hoodie" | "tshirt");
+    if (garmentParam === "hoodie" || garmentParam === "tshirt" || garmentParam === "oversized") {
+      setGarmentType(garmentParam as "hoodie" | "tshirt" | "oversized");
       setShowGarmentModal(false);
     }
 
@@ -201,9 +201,9 @@ export default function DesignLabPage() {
     setCartSuccess(true);
     addItem({
       id: `custom-lab-${Date.now()}`,
-      name: `Custom ${selectedTag} ${garmentType === "hoodie" ? "Hoodie" : "Tee"}`,
-      description: prompt || `Bespoke customized streetwear ${garmentType === "hoodie" ? "hoodie" : "garment"}.`,
-      price: garmentType === "hoodie" ? 1999 : 999, // Hoodies are ₹1999, Tees are ₹999
+      name: `Custom ${selectedTag} ${garmentType === "hoodie" ? "Hoodie" : garmentType === "oversized" ? "Oversized Tee" : "Tee"}`,
+      description: prompt || `Bespoke customized streetwear ${garmentType === "hoodie" ? "hoodie" : garmentType === "oversized" ? "oversized tee" : "garment"}.`,
+      price: garmentType === "hoodie" ? 1999 : garmentType === "oversized" ? 1299 : 999,
       quantity: 1,
       size: size,
       color: color,
@@ -231,8 +231,8 @@ export default function DesignLabPage() {
     try {
       const { error } = await supabase.from("customizations").insert({
         user_id: user.id,
-        name: `Bespoke ${selectedTag} ${garmentType === "hoodie" ? "Hoodie" : "Tee"}`,
-        description: prompt || `Bespoke customized streetwear ${garmentType === "hoodie" ? "hoodie" : "garment"}.`,
+        name: `Bespoke ${selectedTag} ${garmentType === "hoodie" ? "Hoodie" : garmentType === "oversized" ? "Oversized Tee" : "Tee"}`,
+        description: prompt || `Bespoke customized streetwear ${garmentType === "hoodie" ? "hoodie" : garmentType === "oversized" ? "oversized tee" : "garment"}.`,
         color,
         design: selectedTag.toLowerCase(),
         custom_texture_url: customTextureUrl,
@@ -523,8 +523,8 @@ export default function DesignLabPage() {
                   <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest font-bold">
                     Select Garment Type
                   </span>
-                  <div className="flex bg-neutral-100 p-1 rounded-xl border border-neutral-200 max-w-[200px]">
-                    {(["tshirt", "hoodie"] as const).map((type) => {
+                  <div className="flex bg-neutral-100 p-1 rounded-xl border border-neutral-200 max-w-[280px]">
+                    {(["tshirt", "oversized", "hoodie"] as const).map((type) => {
                       const isActive = garmentType === type;
                       return (
                         <button
@@ -534,7 +534,7 @@ export default function DesignLabPage() {
                             isActive ? "bg-white text-black shadow-sm" : "text-neutral-500 hover:text-neutral-800"
                           }`}
                         >
-                          {type === "tshirt" ? "T-Shirt" : "Hoodie"}
+                          {type === "tshirt" ? "T-Shirt" : type === "oversized" ? "Oversized" : "Hoodie"}
                         </button>
                       );
                     })}
@@ -838,7 +838,7 @@ export default function DesignLabPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               {/* T-Shirt option */}
               <button
                 onClick={() => {
@@ -847,12 +847,29 @@ export default function DesignLabPage() {
                 }}
                 className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-neutral-100 hover:border-blue-500 hover:bg-blue-50/10 transition-all group cursor-pointer"
               >
-                <div className="h-16 w-16 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-3xl">👕</span>
+                <div className="h-14 w-14 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-2xl">👕</span>
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-neutral-800 uppercase block">Streetwear Tee</span>
-                  <span className="text-[10px] text-neutral-400 block mt-0.5">Classic crewneck</span>
+                  <span className="text-[10px] font-bold text-neutral-800 uppercase block">Streetwear Tee</span>
+                  <span className="text-[9px] text-neutral-400 block mt-0.5">Classic crewneck</span>
+                </div>
+              </button>
+
+              {/* Oversized T-Shirt option */}
+              <button
+                onClick={() => {
+                  setGarmentType("oversized");
+                  setShowGarmentModal(false);
+                }}
+                className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-neutral-100 hover:border-blue-500 hover:bg-blue-50/10 transition-all group cursor-pointer"
+              >
+                <div className="h-14 w-14 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-2xl">👔</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-neutral-800 uppercase block">Oversized Tee</span>
+                  <span className="text-[9px] text-neutral-400 block mt-0.5">Drop-shoulder fit</span>
                 </div>
               </button>
 
@@ -864,12 +881,12 @@ export default function DesignLabPage() {
                 }}
                 className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-neutral-100 hover:border-blue-500 hover:bg-blue-50/10 transition-all group cursor-pointer"
               >
-                <div className="h-16 w-16 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-3xl">🧥</span>
+                <div className="h-14 w-14 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <span className="text-2xl">🧥</span>
                 </div>
                 <div>
-                  <span className="text-xs font-bold text-neutral-800 uppercase block">Premium Hoodie</span>
-                  <span className="text-[10px] text-neutral-400 block mt-0.5">Heavy fleece hoodie</span>
+                  <span className="text-[10px] font-bold text-neutral-800 uppercase block">Premium Hoodie</span>
+                  <span className="text-[9px] text-neutral-400 block mt-0.5">Heavy fleece</span>
                 </div>
               </button>
             </div>
