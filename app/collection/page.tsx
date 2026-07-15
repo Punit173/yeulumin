@@ -134,7 +134,7 @@ export default function UserCollectionPage() {
         </div>
 
         {customizations.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-2 sm:gap-8">
             {customizations.map((item) => {
               // Create dynamic remix URL passing all specific styling states
               const remixUrl = `/customize?color=${encodeURIComponent(item.color)}&design=${encodeURIComponent(item.design)}&texture=${encodeURIComponent(item.custom_texture_url || "")}&scale=${item.decal_scale}&x=${item.decal_pos_x}&y=${item.decal_pos_y}&target=${encodeURIComponent(item.decal_target)}`;
@@ -142,11 +142,11 @@ export default function UserCollectionPage() {
               return (
                 <div
                   key={item.id}
-                  className="bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
+                  className="bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-xl sm:rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
                 >
                   <div>
                     {/* Image wrapper */}
-                    <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-8">
+                    <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-2 sm:p-8">
                       {/* Avatar preview decal or default */}
                       {item.custom_texture_url ? (
                         <img
@@ -155,9 +155,9 @@ export default function UserCollectionPage() {
                           className="max-h-full max-w-full object-contain rounded border border-neutral-100 transition-transform duration-500 group-hover:scale-103 bg-white"
                         />
                       ) : (
-                        <div className="flex flex-col items-center gap-2 text-neutral-400">
-                          <span className="text-3xl">⬜</span>
-                          <span className="text-[10px] font-mono uppercase tracking-wider">
+                        <div className="flex flex-col items-center gap-1 sm:gap-2 text-neutral-400">
+                          <span className="text-xl sm:text-3xl">⬜</span>
+                          <span className="text-[8px] sm:text-[10px] font-mono uppercase tracking-wider text-center">
                             Procedural Design
                           </span>
                         </div>
@@ -166,37 +166,37 @@ export default function UserCollectionPage() {
                       {/* Delete button */}
                       <button
                         onClick={(e) => handleDelete(item.id, e)}
-                        className="absolute top-3.5 right-3.5 z-10 p-2 rounded-full bg-white border border-neutral-200 text-neutral-400 hover:text-red-500 hover:border-red-100 hover:bg-red-50/20 transition-all cursor-pointer shadow-sm"
+                        className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 z-10 p-1 sm:p-2 rounded-full bg-white border border-neutral-200 text-neutral-400 hover:text-red-500 hover:border-red-100 hover:bg-red-50/20 transition-all cursor-pointer shadow-sm"
                         title="Delete design"
                       >
-                        <Trash2 className="h-4.5 w-4.5" />
+                        <Trash2 className="h-3 w-3 sm:h-4.5 sm:w-4.5" />
                       </button>
 
                       {/* Hover Overlay */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4">
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-2 sm:p-4">
                         <Link
                           href={remixUrl}
-                          className="px-6 py-2.5 bg-white text-black text-xs font-bold rounded-lg shadow hover:bg-neutral-100 transition-all uppercase tracking-wider"
+                          className="px-2 py-1.5 sm:px-6 sm:py-2.5 bg-white text-black text-[9px] sm:text-xs font-bold rounded-lg shadow hover:bg-neutral-100 transition-all uppercase tracking-wider text-center"
                         >
-                          Remix in Design Lab
+                          Remix
                         </Link>
                       </div>
                     </div>
 
                     {/* Detail contents */}
-                    <div className="p-6 text-left">
-                      <span className="text-[10px] uppercase font-mono tracking-widest text-neutral-400 block mb-1.5 font-bold">
+                    <div className="p-2 sm:p-6 text-left">
+                      <span className="text-[8px] sm:text-[10px] uppercase font-mono tracking-widest text-neutral-400 block mb-1 sm:mb-1.5 font-bold truncate">
                         Style: {item.design.toUpperCase()} | Color:{" "}
                         <span
                           className="inline-block w-2.5 h-2.5 rounded-full border border-neutral-200 align-middle"
                           style={{ backgroundColor: item.color }}
                         />
                       </span>
-                      <div className="flex justify-between items-start mb-4">
-                        <h2 className="font-bold text-neutral-800 text-base group-hover:text-black transition-colors leading-snug">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 sm:mb-4 gap-0.5 sm:gap-2">
+                        <h2 className="font-bold text-neutral-800 text-[10px] sm:text-base group-hover:text-black transition-colors leading-snug truncate sm:whitespace-normal">
                           {item.name}
                         </h2>
-                        <span className="font-mono text-neutral-900 font-bold text-base whitespace-nowrap ml-3">
+                        <span className="font-mono text-neutral-900 font-bold text-[10px] sm:text-base whitespace-nowrap">
                           ₹999
                         </span>
                       </div>
@@ -204,24 +204,25 @@ export default function UserCollectionPage() {
                       {/* Add to Cart Button */}
                       <button
                         onClick={() => handleAddToCart(item)}
-                        className="w-full py-2.5 bg-[#111111] hover:bg-black text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                        className="w-full py-1.5 sm:py-2.5 bg-[#111111] hover:bg-black text-white text-[9px] sm:text-xs font-bold rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-sm"
                       >
-                        <ShoppingBag className="h-4 w-4" />
-                        <span>{cartSuccessId === item.id ? "Added!" : "Add to Cart (₹999)"}</span>
+                        <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">{cartSuccessId === item.id ? "Added!" : "Add to Cart (₹999)"}</span>
+                        <span className="inline sm:hidden">{cartSuccessId === item.id ? "Added!" : "Add"}</span>
                       </button>
                     </div>
                   </div>
 
-                  <div className="px-6 pb-6 pt-2 border-t border-neutral-100 flex justify-between items-center bg-white">
-                    <span className="text-[9px] font-mono text-neutral-400">
+                  <div className="px-2 py-2 sm:px-6 sm:pb-6 sm:pt-2 border-t border-neutral-100 flex justify-between items-center bg-white">
+                    <span className="text-[8px] sm:text-[9px] font-mono text-neutral-400 truncate">
                       Saved: {new Date(item.created_at).toLocaleDateString()}
                     </span>
                     <Link
                       href={remixUrl}
-                      className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                      className="text-[9px] sm:text-xs font-bold text-blue-600 hover:underline flex items-center gap-0.5 sm:gap-1"
                     >
                       <span>Load Lab</span>
-                      <ArrowRight className="h-3 w-3" />
+                      <ArrowRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                     </Link>
                   </div>
                 </div>

@@ -5,7 +5,7 @@ export interface Product {
   price: number;
   badge?: "Bestseller" | "New Drop" | "AI Generated";
   image: string;
-  category: "Abstract" | "Typographic" | "Minimal" | "Illustrated";
+  category: "Abstract" | "Minimal" | "Streetwear" | "Vintage" | "Anime";
   tags: string[];
   defaultColor?: string;
   defaultView?: "front" | "back";
@@ -17,12 +17,12 @@ export const PRODUCTS: Product[] = [
   {
     id: "9",
     name: "Focus On The Good",
-    description: "Inspiring white heavy-cotton tee featuring the 'Focus on the Good' typographic design with a custom smiley and planetary globe print on the back.",
+    description: "Inspiring white heavy-cotton tee featuring the 'Focus on the Good' design with a custom smiley and planetary globe print on the back.",
     price: 1499,
     badge: "Bestseller",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_03_50 PM.png",
-    category: "Illustrated",
-    tags: ["typographic", "illustrated", "motivational"],
+    category: "Minimal",
+    tags: ["minimal", "motivational"],
     defaultColor: "#ffffff",
     defaultView: "back",
     printPosition: "back",
@@ -35,8 +35,8 @@ export const PRODUCTS: Product[] = [
     price: 2999,
     badge: "New Drop",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_09_57 PM.png",
-    category: "Typographic",
-    tags: ["streetwear", "hoodie", "typographic"],
+    category: "Streetwear",
+    tags: ["streetwear", "hoodie"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
     printPosition: "back",
@@ -45,11 +45,11 @@ export const PRODUCTS: Product[] = [
   {
     id: "11",
     name: "Future Is Now",
-    description: "White long sleeve tee sporting a high-fidelity vertical purple nebula and rocket launch console print, complete with authentic Japanese typography.",
+    description: "White long sleeve tee sporting a high-fidelity vertical purple nebula and rocket launch console print, complete with authentic Japanese elements.",
     price: 1799,
     badge: "AI Generated",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_12_21 PM.png",
-    category: "Illustrated",
+    category: "Anime",
     tags: ["cosmic", "anime", "future"],
     defaultColor: "#ffffff",
     defaultView: "back",
@@ -59,12 +59,12 @@ export const PRODUCTS: Product[] = [
   {
     id: "12",
     name: "Chaos Core",
-    description: "Classic oversized black streetwear tee with blue gothic 'chaos' typography overlaid on a cybernetic astronomical constellation grid.",
+    description: "Classic oversized black streetwear tee with blue gothic 'chaos' details overlaid on a cybernetic astronomical constellation grid.",
     price: 1599,
     badge: "Bestseller",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_15_32 PM.png",
-    category: "Abstract",
-    tags: ["chaos", "gothic", "geometry"],
+    category: "Streetwear",
+    tags: ["streetwear", "chaos", "gothic", "geometry"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
     printPosition: "back",
@@ -77,8 +77,8 @@ export const PRODUCTS: Product[] = [
     price: 1699,
     badge: "AI Generated",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_17_42 PM.png",
-    category: "Illustrated",
-    tags: ["portal", "mystical", "japanese"],
+    category: "Streetwear",
+    tags: ["streetwear", "portal", "mystical", "japanese"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
     printPosition: "back",
@@ -87,11 +87,11 @@ export const PRODUCTS: Product[] = [
   {
     id: "14",
     name: "Discipline Repeat",
-    description: "High-contrast block typography tee displaying repeated 'DISCIPLINE' screenprints in alternating neon red and industrial white.",
+    description: "High-contrast block design tee displaying repeated 'DISCIPLINE' screenprints in alternating neon red and industrial white.",
     price: 1399,
     badge: "New Drop",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_20_49 PM.png",
-    category: "Typographic",
+    category: "Minimal",
     tags: ["minimal", "discipline", "bold"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
@@ -105,8 +105,8 @@ export const PRODUCTS: Product[] = [
     price: 1899,
     badge: "AI Generated",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_24_22 PM.png",
-    category: "Illustrated",
-    tags: ["skull", "chaos", "graffiti"],
+    category: "Streetwear",
+    tags: ["streetwear", "skull", "chaos", "graffiti"],
     defaultColor: "#ffffff",
     defaultView: "back",
     printPosition: "back",
@@ -119,8 +119,8 @@ export const PRODUCTS: Product[] = [
     price: 3199,
     badge: "Bestseller",
     image: "/collection/ChatGPT Image Jun 30, 2026, 12_26_19 PM.png",
-    category: "Illustrated",
-    tags: ["oni", "demon", "streetwear"],
+    category: "Anime",
+    tags: ["anime", "oni", "demon", "streetwear"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
     printPosition: "back",
@@ -129,11 +129,11 @@ export const PRODUCTS: Product[] = [
   {
     id: "3",
     name: "Mindset",
-    description: "Premium heavy-cotton crewneck tee in vintage cream, showcasing a clean typographic print 'FOCUS DISCIPLINE SUCCESS' with 'NO EXCUSES' tagline.",
+    description: "Premium heavy-cotton crewneck tee in vintage cream, showcasing a clean print 'FOCUS DISCIPLINE SUCCESS' with 'NO EXCUSES' tagline.",
     price: 1699,
     badge: "New Drop",
     image: "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=600&auto=format&fit=crop&q=80",
-    category: "Typographic",
+    category: "Minimal",
     tags: ["mindset", "minimal", "motivation"],
     defaultColor: "#f5e6d3",
     defaultView: "front",
@@ -147,8 +147,8 @@ export const PRODUCTS: Product[] = [
     price: 1599,
     badge: "New Drop",
     image: "/collection/ChatGPT Image Jun 30, 2026, 02_39_42 PM.png",
-    category: "Abstract",
-    tags: ["smiley", "acid", "splatter"],
+    category: "Streetwear",
+    tags: ["streetwear", "smiley", "acid", "splatter"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
     printPosition: "back",
@@ -161,8 +161,8 @@ export const PRODUCTS: Product[] = [
     price: 1899,
     badge: "AI Generated",
     image: "/collection/ChatGPT Image Jun 30, 2026, 02_45_20 PM.png",
-    category: "Illustrated",
-    tags: ["cyberpunk", "metropolis", "neon"],
+    category: "Streetwear",
+    tags: ["streetwear", "cyberpunk", "metropolis", "neon"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
     printPosition: "back",
@@ -175,7 +175,7 @@ export const PRODUCTS: Product[] = [
     price: 3299,
     badge: "Bestseller",
     image: "/collection/ChatGPT Image Jun 30, 2026, 02_48_19 PM.png",
-    category: "Illustrated",
+    category: "Anime",
     tags: ["anime", "streetwear", "ghoul"],
     defaultColor: "#1a1a1a",
     defaultView: "back",
@@ -184,4 +184,4 @@ export const PRODUCTS: Product[] = [
   }
 ];
 
-export const CATEGORIES = ["All", "Minimal", "Streetwear", "Typographic", "Vintage", "Anime"];
+export const CATEGORIES = ["All", "Minimal", "Streetwear", "Vintage", "Anime"];

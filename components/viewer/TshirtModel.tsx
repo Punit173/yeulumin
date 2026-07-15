@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, Decal, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { useViewerStore } from "./useViewerStore";
@@ -131,6 +131,20 @@ export default function TshirtModel({
   const { color, design, view, customTextureUrl, decalScale, decalPosY, decalPosX, decalTarget } = useViewerStore();
   const meshRef = useRef<THREE.Mesh>(null);
   const controlsRef = useRef<any>(null);
+
+  // Access three.js canvas size
+  const { size: canvasSize } = useThree();
+
+  // Dynamically adjust scale on narrow screen aspect ratios to maximize size without clipping
+  const responsiveScale = useMemo(() => {
+    const aspect = canvasSize.width / canvasSize.height;
+    if (aspect < 1) {
+      // Scale up on portrait viewports
+      const scaleMultiplier = Math.min(2.25, 1.2 / aspect);
+      return scale * scaleMultiplier;
+    }
+    return scale;
+  }, [scale, canvasSize.width, canvasSize.height]);
 
   // Load the GLTF/GLB model
   const { nodes, materials } = useGLTF("/models/tshirt.glb") as any;
@@ -298,7 +312,7 @@ export default function TshirtModel({
 
   return (
     <>
-      <group position={[0, -0.55, 0]} scale={[scale, scale, scale]}>
+      <group position={[0, -0.55, 0]} scale={[responsiveScale, responsiveScale, responsiveScale]}>
         <mesh
           ref={meshRef}
           castShadow
@@ -343,8 +357,8 @@ export default function TshirtModel({
         ref={controlsRef}
         target={[0, -0.55, 0]}
         enablePan={false}
-        minDistance={2}
-        maxDistance={6}
+        minDistance={1.5}
+        maxDistance={5}
         minPolarAngle={Math.PI / 4}
         maxPolarAngle={Math.PI / 1.6}
         enableDamping

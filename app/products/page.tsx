@@ -217,7 +217,7 @@ export default function ProductsPage() {
             </span>
           </div>
         ) : processedProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-2 sm:gap-8">
             {processedProducts.map((product) => {
               const isWishlisted = wishlistedIds.includes(product.id);
               const isMenuOpen = activeMenuId === product.id;
@@ -225,13 +225,13 @@ export default function ProductsPage() {
               return (
                 <div
                   key={product.id}
-                  className="bg-white border border-neutral-200/60 hover:border-neutral-300 rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
+                  className="bg-white border border-neutral-200/60 hover:border-neutral-300 rounded-xl sm:rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
                 >
                   <div className="relative">
                     {/* Visual Card Image */}
                     <Link
                       href={`/customize?preset=${product.id}`}
-                      className="aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-6 block relative"
+                      className="aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-2 sm:p-6 block relative"
                     >
                       <img
                         src={product.image}
@@ -242,34 +242,34 @@ export default function ProductsPage() {
 
                     {/* Direct success prompt */}
                     {cartSuccessId === product.id && (
-                      <div className="absolute inset-0 bg-black/80 flex items-center justify-center text-white text-xs font-bold font-mono tracking-widest rounded-t-2xl z-10">
-                        ADDED TO CART!
+                      <div className="absolute inset-0 bg-black/80 flex items-center justify-center text-white text-[9px] sm:text-xs font-bold font-mono tracking-widest rounded-t-xl sm:rounded-t-2xl z-10 text-center px-1">
+                        ADDED!
                       </div>
                     )}
                   </div>
 
                   {/* Card footer details & Context menu */}
-                  <div className="p-5 flex justify-between items-center relative border-t border-neutral-100 bg-white">
-                    <div className="text-left">
-                      <h3 className="font-bold text-neutral-800 text-sm group-hover:text-black transition-colors leading-tight">
+                  <div className="p-2 sm:p-5 flex justify-between items-center relative border-t border-neutral-100 bg-white min-w-0">
+                    <div className="text-left min-w-0 flex-1">
+                      <h3 className="font-bold text-neutral-800 text-[10px] sm:text-sm group-hover:text-black transition-colors leading-tight truncate">
                         {product.name}
                       </h3>
-                      <span className="text-[10px] text-neutral-400 font-mono block mt-1">
+                      <span className="text-[8px] sm:text-[10px] text-neutral-400 font-mono block mt-0.5 sm:mt-1 truncate">
                         {product.version}
                       </span>
                     </div>
 
-                    <div className="relative">
+                    <div className="relative flex-shrink-0">
                       {/* Vertical three dots toggle */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveMenuId(isMenuOpen ? null : product.id);
                         }}
-                        className="p-1.5 rounded-full hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-800 cursor-pointer"
+                        className="p-1 sm:p-1.5 rounded-full hover:bg-neutral-100 transition-colors text-neutral-500 hover:text-neutral-800 cursor-pointer"
                         title="Options"
                       >
-                        <MoreVertical className="h-4.5 w-4.5" />
+                        <MoreVertical className="h-3.5 w-3.5 sm:h-4.5 sm:w-4.5" />
                       </button>
 
                       {/* Dropdown Options menu */}
@@ -281,24 +281,26 @@ export default function ProductsPage() {
                             onClick={() => setActiveMenuId(null)}
                           />
                           
-                          <div className="absolute right-0 bottom-8 w-44 rounded-xl bg-white border border-neutral-200/80 p-1.5 shadow-xl z-40 flex flex-col gap-0.5 animate-fadeIn">
+                          <div className="absolute right-0 bottom-8 w-32 sm:w-44 rounded-xl bg-white border border-neutral-200/80 p-1.5 shadow-xl z-40 flex flex-col gap-0.5 animate-fadeIn">
                             <button
                               onClick={() => handleAddToCart(product)}
-                              className="px-3 py-2 text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50 hover:text-black rounded-lg text-left flex items-center gap-2 cursor-pointer w-full"
+                              className="px-2 py-1.5 sm:px-3 sm:py-2 text-[9px] sm:text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50 hover:text-black rounded-lg text-left flex items-center gap-1.5 sm:gap-2 cursor-pointer w-full"
                             >
-                              <ShoppingBag className="h-3.5 w-3.5" />
-                              <span>Add to Cart (₹{product.price})</span>
+                              <ShoppingBag className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                              <span className="hidden sm:inline">Add to Cart (₹{product.price})</span>
+                              <span className="inline sm:hidden">Add (₹{product.price})</span>
                             </button>
                             <button
                               onClick={() => handleToggleWishlist(product.id)}
-                              className={`px-3 py-2 text-[11px] font-semibold rounded-lg text-left flex items-center gap-2 cursor-pointer w-full ${
+                              className={`px-2 py-1.5 sm:px-3 sm:py-2 text-[9px] sm:text-[11px] font-semibold rounded-lg text-left flex items-center gap-1.5 sm:gap-2 cursor-pointer w-full ${
                                 isWishlisted
                                   ? "text-red-500 hover:bg-red-50/20"
                                   : "text-neutral-700 hover:bg-neutral-50"
                               }`}
                             >
-                              <Heart className={`h-3.5 w-3.5 ${isWishlisted ? "fill-current" : ""}`} />
-                              <span>{isWishlisted ? "Wishlisted" : "Add to Wishlist"}</span>
+                              <Heart className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isWishlisted ? "fill-current" : ""}`} />
+                              <span className="hidden sm:inline">{isWishlisted ? "Wishlisted" : "Add to Wishlist"}</span>
+                              <span className="inline sm:hidden">{isWishlisted ? "Wishlisted" : "Wishlist"}</span>
                             </button>
                           </div>
                         </>

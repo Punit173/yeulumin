@@ -292,7 +292,7 @@ export default function DesignLabPage() {
       <main className="flex-grow flex flex-col items-center justify-center relative select-none w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 gap-6">
         
         {/* 3D MANNEQUIN SHOWROOM STAGE */}
-        <div className="w-full max-w-2xl h-[400px] md:h-[450px] relative flex items-center justify-center">
+        <div className="w-full max-w-2xl h-[440px] md:h-[500px] relative flex items-center justify-center">
           
           {/* Orbital blue glow ring behind t-shirt mesh */}
           <div className="absolute inset-0 m-auto w-[18rem] h-[18rem] sm:w-[22rem] sm:h-[22rem] md:w-[28rem] md:h-[28rem] rounded-full border border-blue-500/10 bg-transparent flex items-center justify-center pointer-events-none select-none z-0">
@@ -302,9 +302,9 @@ export default function DesignLabPage() {
           {/* Three.js interactive model canvas */}
           <div className="absolute inset-0 z-10">
             <TshirtViewer
-              scale={1.3}
+              scale={1.5}
               autoRotateSpeed={autoRotate ? 2.0 : 0}
-              cameraDistance={zoomLevel === "close" ? 2.8 : 4.2}
+              cameraDistance={zoomLevel === "close" ? 2.4 : 3.6}
             />
           </div>
 

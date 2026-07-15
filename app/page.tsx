@@ -199,7 +199,7 @@ export default function HomePage() {
             
             {/* Category pills */}
             <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto scrollbar-none">
-              {["All", "Minimal", "Streetwear", "Typographic", "Vintage", "Anime"].map((cat) => {
+              {["All", "Minimal", "Streetwear", "Vintage", "Anime"].map((cat) => {
                 const isActive = selectedCategory === cat;
                 return (
                   <button
@@ -233,28 +233,28 @@ export default function HomePage() {
 
           {/* Catalog products list cards */}
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-3 gap-2 sm:gap-8">
               {filteredProducts.map((product) => {
                 const isWishlisted = wishlistedIds.includes(product.id);
                 return (
                   <div
                     key={product.id}
-                    className="bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
+                    className="bg-white border border-neutral-200/80 hover:border-neutral-300 rounded-xl sm:rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
                   >
                     <div>
                       {/* Image container */}
-                      <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-6">
+                      <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-2 sm:p-6">
                         
                         {/* Custom Wishlist heart trigger */}
                         <button
                           onClick={(e) => handleToggleWishlist(product.id, e)}
-                          className={`absolute top-4 right-4 z-20 p-2 rounded-full border bg-white shadow-sm transition-all duration-200 hover:scale-105 cursor-pointer ${
+                          className={`absolute top-2 right-2 sm:top-4 sm:right-4 z-20 p-1 sm:p-2 rounded-full border bg-white shadow-sm transition-all duration-200 hover:scale-105 cursor-pointer ${
                             isWishlisted
                               ? "border-red-100 text-red-500 fill-current"
                               : "border-neutral-100 text-neutral-400 hover:text-red-500"
                           }`}
                         >
-                          <Heart className="h-4 w-4" />
+                          <Heart className="h-3 w-3 sm:h-4 sm:w-4" />
                         </button>
 
                         <img
@@ -267,15 +267,15 @@ export default function HomePage() {
                       </div>
 
                       {/* Detail contents */}
-                      <div className="p-6 text-left">
-                        <span className="text-[10px] uppercase font-mono tracking-widest text-neutral-400 block mb-1.5 font-bold">
+                      <div className="p-2 sm:p-6 text-left">
+                        <span className="text-[8px] sm:text-[10px] uppercase font-mono tracking-widest text-neutral-400 block mb-1 sm:mb-1.5 font-bold truncate">
                           {product.category}
                         </span>
-                        <div className="flex justify-between items-start mb-0">
-                          <h3 className="font-bold text-neutral-800 text-base group-hover:text-black transition-colors leading-snug">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-0 gap-0.5 sm:gap-2">
+                          <h3 className="font-bold text-neutral-800 text-[10px] sm:text-base group-hover:text-black transition-colors leading-snug truncate sm:whitespace-normal sm:line-clamp-2">
                             {product.name}
                           </h3>
-                          <span className="font-mono text-neutral-900 font-bold text-base whitespace-nowrap ml-3">
+                          <span className="font-mono text-neutral-900 font-bold text-[10px] sm:text-base whitespace-nowrap">
                             ₹{product.price}
                           </span>
                         </div>
@@ -283,13 +283,14 @@ export default function HomePage() {
                     </div>
 
                     {/* Bottom Actions footer */}
-                    <div className="px-6 pb-6 pt-0 flex gap-3">
+                    <div className="px-2 pb-2 sm:px-6 sm:pb-6 pt-0 flex gap-3">
                       <button
                         onClick={(e) => handleAddToCart(product, e)}
-                        className="w-full py-2.5 bg-[#111111] hover:bg-black text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                        className="w-full py-1.5 sm:py-2.5 bg-[#111111] hover:bg-black text-white text-[9px] sm:text-xs font-bold rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-sm"
                       >
-                        <ShoppingBag className="h-4 w-4" />
-                        <span>{cartSuccessId === product.id ? "Added!" : "Add to Cart"}</span>
+                        <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">{cartSuccessId === product.id ? "Added!" : "Add to Cart"}</span>
+                        <span className="inline sm:hidden">{cartSuccessId === product.id ? "Added!" : "Add"}</span>
                       </button>
                     </div>
 

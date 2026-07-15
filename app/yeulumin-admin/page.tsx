@@ -67,7 +67,7 @@ export default function AdminPage() {
     price: 999,
     badge: "New Drop" as "Bestseller" | "New Drop" | "AI Generated",
     image: "",
-    category: "Abstract" as "Abstract" | "Typographic" | "Minimal" | "Illustrated",
+    category: "Abstract" as "Abstract" | "Minimal" | "Streetwear" | "Vintage" | "Anime",
     tagsString: "",
     defaultColor: "#ffffff",
     defaultView: "front" as "front" | "back",
@@ -527,9 +527,10 @@ export default function AdminPage() {
                       className="bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl px-3 py-2.5 text-neutral-800 placeholder-neutral-400 focus:outline-none transition-colors cursor-pointer shadow-sm"
                     >
                       <option value="Abstract">Abstract</option>
-                      <option value="Typographic">Typographic</option>
                       <option value="Minimal">Minimal</option>
-                      <option value="Illustrated">Illustrated</option>
+                      <option value="Streetwear">Streetwear</option>
+                      <option value="Vintage">Vintage</option>
+                      <option value="Anime">Anime</option>
                     </select>
                   </div>
                 </div>
