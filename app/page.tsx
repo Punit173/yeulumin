@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles, ShoppingBag, Heart, Search, SlidersHorizontal, ArrowRight, Home as HomeIcon, Image as GalleryIcon, User, Menu, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, ShoppingBag, Heart, Search, SlidersHorizontal, Home as HomeIcon, Image as GalleryIcon, User, Menu, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import GrainOverlay from "./components/GrainOverlay";
@@ -195,7 +195,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── 2. CURRENT OFFERS BANNER ─── */}
-      <section className="w-full px-4 sm:px-6 md:px-0 my-4 sm:my-10 md:my-0">
+      <section className="w-full px-4 sm:px-6 md:px-0 my-4 sm:my-8 md:my-0">
         <Link
           href="/products"
           className="block relative w-full aspect-[1706/922] rounded-2xl md:rounded-none overflow-hidden shadow-md md:shadow-none group border border-neutral-200/40 md:border-none"
@@ -208,26 +208,19 @@ export default function HomePage() {
         </Link>
       </section>
 
-      <main className="flex-grow mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12">
+      <main className="flex-grow mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 pt-2 pb-24 md:pb-12">
 
         {/* ─── 3. PRE-DEFINED STYLES GRID SECTION ─── */}
-        <section className="my-4 sm:my-12">
+        <section className="mt-2 mb-4 sm:mt-6 sm:mb-12">
           
           {/* Header titles */}
           <div className="flex justify-between items-end mb-8">
             <div className="text-left flex flex-col gap-1">
-              <h2 className="font-display text-2xl font-black uppercase tracking-wider text-[#0A0A0A]">
+              <h2 className="font-display text-lg sm:text-2xl font-black uppercase tracking-wider text-[#0A0A0A]">
                 PRE-DEFINED STYLES
               </h2>
               <div className="h-[2px] w-12 bg-neutral-900" />
             </div>
-            <Link
-              href="/products"
-              className="text-xs font-semibold text-neutral-500 hover:text-black transition-colors flex items-center gap-1"
-            >
-              <span>View all</span>
-              <ArrowRight className="h-3 w-3" />
-            </Link>
           </div>
 
           {/* Filter Bar & Search Row */}
@@ -254,7 +247,7 @@ export default function HomePage() {
             </div>
 
             {/* Search Input Box */}
-            <div className="relative w-full sm:max-w-xs">
+            <div className="hidden sm:block relative w-full sm:max-w-xs">
               <input
                 type="text"
                 value={searchQuery}
