@@ -828,31 +828,54 @@ export default function DesignLabPage() {
       {/* GARMENT SELECTION INITIAL MODAL POP-UP */}
       {showGarmentModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md animate-fadeIn px-4">
-          <div className="bg-white border border-neutral-200 shadow-2xl rounded-3xl p-6 sm:p-8 max-w-md w-full text-center flex flex-col gap-6 animate-scaleUp">
+          <div className="bg-white/95 backdrop-blur-2xl border border-neutral-200/90 shadow-[0_25px_60px_rgba(0,0,0,0.2)] rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center flex flex-col gap-6 animate-scaleUp relative overflow-hidden">
+            
+            {/* Ambient Background Glows */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+
             <div>
-              <h2 className="text-xl font-display font-black uppercase tracking-wider text-neutral-900">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-[10px] font-mono font-bold uppercase tracking-widest mb-3">
+                <Sparkles className="w-3 h-3 text-blue-600" />
+                <span>STEP 1: SELECT CANVAS</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-display font-black uppercase tracking-wider text-neutral-900">
                 Select Your Canvas
               </h2>
-              <p className="text-xs text-neutral-400 font-mono mt-1 uppercase tracking-widest">
+              <p className="text-xs text-neutral-500 font-mono mt-1 uppercase tracking-widest">
                 Choose base garment structure
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3.5">
               {/* T-Shirt option */}
               <button
                 onClick={() => {
                   setGarmentType("tshirt");
                   setShowGarmentModal(false);
                 }}
-                className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-neutral-100 hover:border-blue-500 hover:bg-blue-50/10 transition-all group cursor-pointer"
+                className={`relative flex flex-col items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 group cursor-pointer ${
+                  garmentType === "tshirt"
+                    ? "border-blue-600 bg-blue-50/40 ring-4 ring-blue-500/15 shadow-md"
+                    : "border-neutral-200/70 bg-neutral-50/60 hover:border-blue-500 hover:bg-blue-50/20 hover:shadow-md"
+                }`}
               >
-                <div className="h-14 w-14 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-2xl">👕</span>
+                {garmentType === "tshirt" && (
+                  <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                    <Check className="h-3 w-3" />
+                  </div>
+                )}
+                <div className="h-14 w-14 rounded-2xl bg-white border border-neutral-200/80 group-hover:border-blue-200 group-hover:bg-blue-50/80 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105">
+                  <svg className={`w-7 h-7 transition-colors ${garmentType === "tshirt" ? "text-blue-600" : "text-neutral-700 group-hover:text-blue-600"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 3.5L9.5 2h5L18 3.5l3.5 4-2.5 3-2.5-1.5V21H7.5V9L5 10.5l-2.5-3L6 3.5z" />
+                    <path d="M9.5 2c0 1.5 1.1 2.5 2.5 2.5s2.5-1 2.5-2.5" />
+                  </svg>
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-neutral-800 uppercase block">Streetwear Tee</span>
-                  <span className="text-[9px] text-neutral-400 block mt-0.5">Classic crewneck</span>
+                <div className="mt-3">
+                  <span className={`text-[11px] font-bold uppercase block tracking-tight transition-colors ${garmentType === "tshirt" ? "text-blue-600" : "text-neutral-900 group-hover:text-blue-600"}`}>
+                    Streetwear Tshirt
+                  </span>
+                  <span className="text-[9px] text-neutral-400 font-mono block mt-0.5">Classic crewneck</span>
                 </div>
               </button>
 
@@ -862,14 +885,29 @@ export default function DesignLabPage() {
                   setGarmentType("oversized");
                   setShowGarmentModal(false);
                 }}
-                className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-neutral-100 hover:border-blue-500 hover:bg-blue-50/10 transition-all group cursor-pointer"
+                className={`relative flex flex-col items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 group cursor-pointer ${
+                  garmentType === "oversized"
+                    ? "border-blue-600 bg-blue-50/40 ring-4 ring-blue-500/15 shadow-md"
+                    : "border-neutral-200/70 bg-neutral-50/60 hover:border-blue-500 hover:bg-blue-50/20 hover:shadow-md"
+                }`}
               >
-                <div className="h-14 w-14 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-2xl">👔</span>
+                {garmentType === "oversized" && (
+                  <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                    <Check className="h-3 w-3" />
+                  </div>
+                )}
+                <div className="h-14 w-14 rounded-2xl bg-white border border-neutral-200/80 group-hover:border-blue-200 group-hover:bg-blue-50/80 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105">
+                  <svg className={`w-7 h-7 transition-colors ${garmentType === "oversized" ? "text-blue-600" : "text-neutral-700 group-hover:text-blue-600"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3.5 4.5L8.5 2h7l5 2.5 3 4.5-3.5 3-2.5-1.5V22H6.5V11L4 12.5 1 9.5l2.5-5z" />
+                    <path d="M8.5 2c0 2 1.5 3.2 3.5 3.2s3.5-1.2 3.5-3.2" />
+                    <path d="M6.5 10.5h11" strokeDasharray="2 2" />
+                  </svg>
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-neutral-800 uppercase block">Oversized Tee</span>
-                  <span className="text-[9px] text-neutral-400 block mt-0.5">Drop-shoulder fit</span>
+                <div className="mt-3">
+                  <span className={`text-[11px] font-bold uppercase block tracking-tight transition-colors ${garmentType === "oversized" ? "text-blue-600" : "text-neutral-900 group-hover:text-blue-600"}`}>
+                    Oversized Tshirt
+                  </span>
+                  <span className="text-[9px] text-neutral-400 font-mono block mt-0.5">Drop-shoulder fit</span>
                 </div>
               </button>
 
@@ -879,14 +917,31 @@ export default function DesignLabPage() {
                   setGarmentType("hoodie");
                   setShowGarmentModal(false);
                 }}
-                className="flex flex-col items-center gap-3 p-4 rounded-2xl border-2 border-neutral-100 hover:border-blue-500 hover:bg-blue-50/10 transition-all group cursor-pointer"
+                className={`relative flex flex-col items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 group cursor-pointer ${
+                  garmentType === "hoodie"
+                    ? "border-blue-600 bg-blue-50/40 ring-4 ring-blue-500/15 shadow-md"
+                    : "border-neutral-200/70 bg-neutral-50/60 hover:border-blue-500 hover:bg-blue-50/20 hover:shadow-md"
+                }`}
               >
-                <div className="h-14 w-14 bg-neutral-50 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <span className="text-2xl">🧥</span>
+                {garmentType === "hoodie" && (
+                  <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                    <Check className="h-3 w-3" />
+                  </div>
+                )}
+                <div className="h-14 w-14 rounded-2xl bg-white border border-neutral-200/80 group-hover:border-blue-200 group-hover:bg-blue-50/80 shadow-sm flex items-center justify-center transition-all duration-300 group-hover:scale-105">
+                  <svg className={`w-7 h-7 transition-colors ${garmentType === "hoodie" ? "text-blue-600" : "text-neutral-700 group-hover:text-blue-600"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 5.5L9.5 3h5L18 5.5l3.5 4-2.5 3-2-1.5V22H7V11L5 12.5 2.5 9.5 6 5.5z" />
+                    <path d="M9.5 3a2.5 2.5 0 005 0" />
+                    <path d="M12 3v5.5" />
+                    <path d="M9.5 11.5a2.5 2.5 0 005 0" />
+                    <path d="M8.5 16h7v4.5h-7z" />
+                  </svg>
                 </div>
-                <div>
-                  <span className="text-[10px] font-bold text-neutral-800 uppercase block">Premium Hoodie</span>
-                  <span className="text-[9px] text-neutral-400 block mt-0.5">Heavy fleece</span>
+                <div className="mt-3">
+                  <span className={`text-[11px] font-bold uppercase block tracking-tight transition-colors ${garmentType === "hoodie" ? "text-blue-600" : "text-neutral-900 group-hover:text-blue-600"}`}>
+                    Premium Hoodie
+                  </span>
+                  <span className="text-[9px] text-neutral-400 font-mono block mt-0.5">Heavy fleece</span>
                 </div>
               </button>
             </div>

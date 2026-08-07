@@ -9,6 +9,7 @@ import { useViewerStore } from "./useViewerStore";
 // Preload the GLB models
 useGLTF.preload("/models/tshirt.glb");
 useGLTF.preload("/models/premium_eco_hoodie.glb");
+useGLTF.preload("/models/1.glb");
 useGLTF.preload("/models/oversized_t-shirt.glb");
 
 // Helper function to generate design textures on a 512x512 canvas
@@ -155,14 +156,12 @@ export default function TshirtModel({
   const responsiveScale = useMemo(() => {
     const aspect = canvasSize.width / canvasSize.height;
     if (aspect < 1) {
-      // Scale up on portrait viewports
       const scaleMultiplier = Math.min(2.25, 1.2 / aspect);
       return scale * scaleMultiplier;
     }
     return scale;
   }, [scale, canvasSize.width, canvasSize.height]);
 
-  // Load the GLTF/GLB model
   const glbPath = isHoodie
     ? "/models/premium_eco_hoodie.glb"
     : isOversized
@@ -170,61 +169,102 @@ export default function TshirtModel({
       : "/models/tshirt.glb";
   const { nodes, materials, scene } = useGLTF(glbPath) as any;
 
-  // Locate the T-shirt mesh dynamically
   const meshKey = useMemo(() => {
     return Object.keys(nodes).find((key) => nodes[key].type === "Mesh") || "T_Shirt_male";
   }, [nodes]);
   const shirtMeshNode = nodes[meshKey];
 
-  // Apply fabric color to the material dynamically when color changes
+  // Apply fabric color dynamically, strip pre-baked GLB textures (flames design & normal maps), and hide flame stitches
   useEffect(() => {
-    if (useSceneRenderer) {
-      // Apply color to all fabric materials in scene-based models (hoodie + oversized)
-      Object.values(materials).forEach((mat: any) => {
-        if (mat) {
-          if (isHoodie) {
-            // Hoodie: only color FABRIC and Material.002
-            if (mat.name.includes("FABRIC") || mat.name.includes("Material.002")) {
-              mat.color.set(color);
-              mat.aoMap = null;
+    if (useSceneRenderer && scene) {
+      scene.traverse((child: any) => {
+        const name = (child.name || "").toLowerCase();
+        const parentName = (child.parent?.name || "").toLowerCase();
+
+        // Hide flame stitching mesh nodes (hoodie_stitches_0) and flame graphic overlay nodes
+        if (
+          name.includes("stitches") ||
+          name.includes("striki") ||
+          name.includes("flame") ||
+          name.includes("graphic") ||
+          name.includes("print") ||
+          parentName.includes("stitches") ||
+          parentName.includes("striki") ||
+          parentName.includes("flame") ||
+          parentName.includes("graphic") ||
+          parentName.includes("print")
+        ) {
+          child.visible = false;
+        }
+
+        if (child.isMesh && child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((mat: any) => {
+            if (mat) {
+              // Strip pre-baked diffuse texture, normal map (flame contours), & ambient occlusion maps
               mat.map = null;
-              mat.roughness = 0.65;
+              mat.normalMap = null;
+              mat.roughnessMap = null;
+              mat.metalnessMap = null;
+              mat.aoMap = null;
+              mat.emissiveMap = null;
+
+              const matName = (mat.name || "").toLowerCase();
+              const isMetalHardware =
+                matName.includes("material.009") ||
+                matName.includes("material.003") ||
+                matName.includes("metal") ||
+                matName.includes("aglet") ||
+                matName.includes("eyelet");
+
+              if (!isMetalHardware) {
+                mat.color.set(color);
+                mat.roughness = 0.65;
+              }
               mat.needsUpdate = true;
             }
-          } else {
-            // Oversized: single material "Material.001"
-            mat.color.set(color);
-            mat.aoMap = null;
-            mat.map = null;
-            mat.roughness = 0.6;
-            mat.needsUpdate = true;
-          }
+          });
         }
       });
     } else {
       if (shirtMeshNode && shirtMeshNode.material) {
-        shirtMeshNode.material.color.set(color);
+        shirtMeshNode.material.map = null;
+        shirtMeshNode.material.normalMap = null;
+        shirtMeshNode.material.roughnessMap = null;
         shirtMeshNode.material.aoMap = null;
+        shirtMeshNode.material.color.set(color);
         shirtMeshNode.material.roughness = 0.6;
         shirtMeshNode.material.needsUpdate = true;
       }
     }
-  }, [color, shirtMeshNode, materials, useSceneRenderer, isHoodie]);
+  }, [color, shirtMeshNode, materials, useSceneRenderer, isHoodie, scene]);
 
   const hoodieMeshRef = useRef<THREE.Mesh | null>(null);
 
   useEffect(() => {
-    if (isHoodie && nodes.Object_4) {
-      hoodieMeshRef.current = nodes.Object_4;
+    if (isHoodie) {
+      if (nodes.hoodie_Sweat_Rib_1X1_319gsm_hoodie_0) {
+        hoodieMeshRef.current = nodes.hoodie_Sweat_Rib_1X1_319gsm_hoodie_0;
+      } else if (nodes.Object_4) {
+        hoodieMeshRef.current = nodes.Object_4;
+      } else {
+        let foundMesh: THREE.Mesh | null = null;
+        if (scene) {
+          scene.traverse((child: any) => {
+            if (!foundMesh && child.isMesh && child.visible) {
+              foundMesh = child;
+            }
+          });
+        }
+        hoodieMeshRef.current = foundMesh;
+      }
     } else {
       hoodieMeshRef.current = null;
     }
-  }, [isHoodie, nodes]);
+  }, [isHoodie, nodes, scene]);
 
-  // Center scene-based models dynamically on load to prevent floating off-center
   useEffect(() => {
     if (useSceneRenderer && scene) {
-      // Reset only position (NOT rotation/scale — those contain critical axis-swap matrices)
       scene.position.set(0, 0, 0);
       scene.updateMatrixWorld(true);
 
@@ -232,17 +272,14 @@ export default function TshirtModel({
       const center = new THREE.Vector3();
       box.getCenter(center);
 
-      // Shift scene so its visual center sits at the origin
       scene.position.set(-center.x, -center.y, -center.z);
       scene.updateMatrixWorld(true);
     }
   }, [useSceneRenderer, scene]);
 
-  // Generate decal canvas texture (for non-logo designs)
   const [canvasTexture, setCanvasTexture] = useState<THREE.CanvasTexture | null>(null);
 
   useEffect(() => {
-    // If we have a custom generated AI image, we don't need the procedural CanvasTexture
     if (design === "ai" && customTextureUrl) {
       setCanvasTexture(null);
       return;
@@ -257,7 +294,6 @@ export default function TshirtModel({
     };
   }, [design, customTextureUrl]);
 
-  // Load real logo image texture for the 'logo' design
   const [logoTexture, setLogoTexture] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
@@ -275,7 +311,6 @@ export default function TshirtModel({
     };
   }, [design]);
 
-  // Load Stability AI generated texture when design === "ai" and customTextureUrl is set
   const [customTexture, setCustomTexture] = useState<THREE.Texture | null>(null);
 
   useEffect(() => {
@@ -293,13 +328,12 @@ export default function TshirtModel({
     };
   }, [design, customTextureUrl]);
 
-  // State to manage autoRotate toggle on interaction
   const [autoRotate, setAutoRotate] = useState(true);
   const autoRotateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleStart = () => {
     setAutoRotate(false);
-    isAnimatingRef.current = false; // Stop camera view transition if user drags
+    isAnimatingRef.current = false;
     if (autoRotateTimeoutRef.current) {
       clearTimeout(autoRotateTimeoutRef.current);
     }
@@ -314,7 +348,6 @@ export default function TshirtModel({
     }, 3000);
   };
 
-  // Camera preset view transitions
   const prevViewRef = useRef<string>(view);
   const isAnimatingRef = useRef<boolean>(false);
   const targetAzimuth = useRef(0);
@@ -339,38 +372,31 @@ export default function TshirtModel({
   }, [view]);
 
   useFrame((state) => {
-    // 1. Subtle floating animation
     if (meshRef.current) {
       meshRef.current.position.y = Math.sin(state.clock.getElapsedTime() * 0.6) * 0.02;
     }
 
-    // 2. Animate camera view preset transitions
     if (isAnimatingRef.current && controlsRef.current) {
       const camera = state.camera;
       const target = controlsRef.current.target || new THREE.Vector3(0, -0.55, 0);
 
-      // Get current position in spherical coordinates relative to target
       const relPos = new THREE.Vector3().copy(camera.position).sub(target);
       const spherical = new THREE.Spherical().setFromVector3(relPos);
 
-      // Spherical lerping
       const targetAz = targetAzimuth.current;
       const targetPol = targetPolar.current;
 
       let diffTheta = targetAz - spherical.theta;
-      // Normalize azimuthal angle diff to [-PI, PI] to rotate the shortest path
       diffTheta = Math.atan2(Math.sin(diffTheta), Math.cos(diffTheta));
 
       spherical.theta += diffTheta * 0.08;
       spherical.phi = THREE.MathUtils.lerp(spherical.phi, targetPol, 0.08);
 
-      // Map back to cartesian coordinates and update camera
       const newRelPos = new THREE.Vector3().setFromSpherical(spherical);
       camera.position.copy(target).add(newRelPos);
 
       controlsRef.current.update();
 
-      // Check if animation is complete
       const azClose = Math.abs(diffTheta) < 0.01;
       const polClose = Math.abs(spherical.phi - targetPol) < 0.01;
       if (azClose && polClose) {
@@ -380,9 +406,17 @@ export default function TshirtModel({
   });
 
   const isBack = decalTarget === "back";
-  const decalZ = isBack ? -0.125 : 0.125; // slightly increase offset to prevent z-fighting on back
+  const decalZ = isBack ? -0.125 : 0.125;
   const decalRotY = isBack ? Math.PI : 0;
   const adjustedPosX = isBack ? -decalPosX : decalPosX;
+
+  const isEcoHoodie = isHoodie && nodes.hoodie_Sweat_Rib_1X1_319gsm_hoodie_0;
+  const hoodieDecalPos: [number, number, number] = isEcoHoodie
+    ? [adjustedPosX, decalPosY + 0.05, isBack ? -0.14 : 0.14]
+    : [isBack ? -decalPosX * 1000 : decalPosX * 1000, (decalPosY * 1000) + 60, isBack ? -1050 : -925];
+  const hoodieDecalScale: [number, number, number] = isEcoHoodie
+    ? [decalScale, decalScale, decalScale]
+    : [decalScale * 1000, decalScale * 1000, decalScale * 1000];
 
   return (
     <>
@@ -391,32 +425,32 @@ export default function TshirtModel({
           <group position={[0, -0.55, 0]} scale={[responsiveScale, responsiveScale, responsiveScale]}>
             <primitive object={scene} />
           </group>
-          {isHoodie && nodes.Object_4 && canvasTexture && (
+          {isHoodie && hoodieMeshRef.current && canvasTexture && (
             <Decal
               mesh={hoodieMeshRef as any}
-              position={[isBack ? -decalPosX * 1000 : decalPosX * 1000, (decalPosY * 1000) + 60, isBack ? -1050 : -925]}
+              position={hoodieDecalPos}
               rotation={[0, decalRotY, 0]}
-              scale={[decalScale * 1000, decalScale * 1000, decalScale * 1000]}
+              scale={hoodieDecalScale}
               map={canvasTexture}
               polygonOffsetFactor={-1}
             />
           )}
-          {isHoodie && nodes.Object_4 && logoTexture && (
+          {isHoodie && hoodieMeshRef.current && logoTexture && (
             <Decal
               mesh={hoodieMeshRef as any}
-              position={[isBack ? -decalPosX * 1000 : decalPosX * 1000, (decalPosY * 1000) + 60, isBack ? -1050 : -925]}
+              position={hoodieDecalPos}
               rotation={[0, decalRotY, 0]}
-              scale={[decalScale * 1000, decalScale * 1000, decalScale * 1000]}
+              scale={hoodieDecalScale}
               map={logoTexture}
               polygonOffsetFactor={-1}
             />
           )}
-          {isHoodie && nodes.Object_4 && customTexture && (
+          {isHoodie && hoodieMeshRef.current && customTexture && (
             <Decal
               mesh={hoodieMeshRef as any}
-              position={[isBack ? -decalPosX * 1000 : decalPosX * 1000, (decalPosY * 1000) + 60, isBack ? -1050 : -925]}
+              position={hoodieDecalPos}
               rotation={[0, decalRotY, 0]}
-              scale={[decalScale * 1000, decalScale * 1000, decalScale * 1000]}
+              scale={hoodieDecalScale}
               map={customTexture}
               polygonOffsetFactor={-1}
             />

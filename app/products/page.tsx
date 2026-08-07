@@ -217,7 +217,7 @@ export default function ProductsPage() {
             </span>
           </div>
         ) : processedProducts.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 sm:gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-8">
             {processedProducts.map((product) => {
               const isWishlisted = wishlistedIds.includes(product.id);
               const isMenuOpen = activeMenuId === product.id;

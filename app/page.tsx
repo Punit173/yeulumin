@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles, ShoppingBag, Heart, Search, SlidersHorizontal, Home as HomeIcon, Image as GalleryIcon, User, Menu, X, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { Sparkles, ShoppingBag, Heart, Search, SlidersHorizontal, Home as HomeIcon, Image as GalleryIcon, User, Menu, X, ArrowLeft, ChevronLeft, ChevronRight, Tag, ArrowRight } from "lucide-react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import GrainOverlay from "./components/GrainOverlay";
@@ -194,24 +194,40 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── 2. CURRENT OFFERS BANNER ─── */}
-      <section className="w-full px-4 sm:px-6 md:px-0 my-4 sm:my-8 md:my-0">
-        <Link
-          href="/products"
-          className="block relative w-full aspect-[1706/922] rounded-2xl md:rounded-none overflow-hidden shadow-md md:shadow-none group border border-neutral-200/40 md:border-none"
-        >
-          <img
-            src="/offers/ChatGPT Image Jun 30, 2026, 11_45_28 AM.png"
-            alt="Current Offers Banner"
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-102"
-          />
-        </Link>
+      {/* ─── 2. CURRENT OFFERS BANNER (Floating Widget on Laptop, Original on Mobile) ─── */}
+      <section className="w-full px-4 sm:px-6 my-4 sm:my-8 md:max-w-6xl md:mx-auto md:px-8 md:my-14 relative z-10">
+        <div className="md:bg-white md:p-4 md:rounded-[2.25rem] md:shadow-[0_15px_45px_rgba(0,0,0,0.08)] md:border md:border-neutral-200/80 md:transition-all md:duration-500 md:hover:shadow-[0_25px_55px_rgba(0,0,0,0.14)] md:hover:-translate-y-1 group">
+          <Link
+            href="/products"
+            className="block relative w-full aspect-[1706/922] rounded-2xl md:rounded-[1.75rem] overflow-hidden shadow-md md:shadow-inner border border-neutral-200/40 md:border-none group/banner"
+          >
+            <img
+              src="/offers/ChatGPT Image Jun 30, 2026, 11_45_28 AM.png"
+              alt="Current Offers Banner"
+              className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-102 md:group-hover/banner:scale-103"
+            />
+            
+            {/* Top Left Floating Pill Badge (Laptop Only) */}
+            <div className="hidden md:flex absolute top-5 left-5 z-20 items-center gap-1.5 px-4 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-lg">
+              <Tag className="h-3.5 w-3.5 text-blue-400 fill-blue-400/20" />
+              <span className="text-xs font-extrabold uppercase tracking-widest pt-[1px]">
+                EXCLUSIVE DEAL
+              </span>
+            </div>
+
+            {/* Bottom Right Action Pill Badge (Laptop Only) */}
+            <div className="hidden md:flex absolute bottom-5 right-5 z-20 items-center gap-2 px-4 py-2 rounded-full bg-white/95 backdrop-blur-md border border-neutral-200/80 text-neutral-900 shadow-lg group-hover/banner:bg-blue-600 group-hover/banner:text-white group-hover/banner:border-blue-500 transition-all duration-300">
+              <span className="text-xs font-bold uppercase tracking-wider">Claim Offer</span>
+              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover/banner:translate-x-0.5" />
+            </div>
+          </Link>
+        </div>
       </section>
 
-      <main className="flex-grow mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 pt-2 pb-24 md:pb-12">
+      <main className="flex-grow mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 pt-0 md:pt-4 pb-24 md:pb-12">
 
         {/* ─── 3. PRE-DEFINED STYLES GRID SECTION ─── */}
-        <section className="mt-2 mb-4 sm:mt-6 sm:mb-12">
+        <section className="mt-4 sm:mt-8 md:mt-10 mb-4 sm:mb-12">
           
           {/* Header titles */}
           <div className="flex justify-between items-end mb-8">
@@ -262,7 +278,7 @@ export default function HomePage() {
 
           {/* Catalog products list cards */}
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-3 gap-2 sm:gap-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-8">
               {filteredProducts.map((product) => {
                 const isWishlisted = wishlistedIds.includes(product.id);
                 return (

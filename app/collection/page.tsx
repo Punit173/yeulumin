@@ -134,7 +134,7 @@ export default function UserCollectionPage() {
         </div>
 
         {customizations.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2 sm:gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-8">
             {customizations.map((item) => {
               // Create dynamic remix URL passing all specific styling states
               const isHoodieItem = item.name.toLowerCase().includes("hoodie") || (item.description && item.description.toLowerCase().includes("hoodie"));
