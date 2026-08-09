@@ -21,7 +21,7 @@ const ROOT_FOLDER_ID = "19lQ1ZWiZtkW-KD9AH8dRDKT_AEwHK3dF";
 // In-memory cache to prevent hitting Google Drive on every HTTP request
 let cachedData: { categories: string[]; products: DriveProduct[] } | null = null;
 let lastFetchTime = 0;
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes cache
+const CACHE_DURATION_MS = 30 * 1000; // 30 seconds cache
 
 async function fetchHtml(url: string): Promise<string> {
   const res = await fetch(url, {
@@ -29,7 +29,7 @@ async function fetchHtml(url: string): Promise<string> {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     },
-    next: { revalidate: 300 }, // Next.js fetch cache 5 minutes
+    next: { revalidate: 30 }, // Next.js fetch cache 30 seconds
   });
   if (!res.ok) {
     throw new Error(`Failed to fetch ${url}: ${res.status}`);
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     if (!forceRefresh && cachedData && now - lastFetchTime < CACHE_DURATION_MS) {
       return NextResponse.json(cachedData, {
         headers: {
-          "Cache-Control": "public, max-age=60, s-maxage=60",
+          "Cache-Control": "public, max-age=10, s-maxage=10",
         },
       });
     }
@@ -150,12 +150,12 @@ export async function GET(request: Request) {
           id: `gdrive-${file.id}`,
           fileId: file.id,
           name,
-          description: `Bespoke 3D customized streetwear design from the ${folderResult.category} collection.`,
+          description: `Bespoke 3D customized design from the ${folderResult.category} collection.`,
           price,
           badge,
           image: `/api/gdrive/image?id=${file.id}`,
           category: folderResult.category,
-          tags: [folderResult.category.toLowerCase(), "custom", "streetwear"],
+          tags: [folderResult.category.toLowerCase(), "custom"],
           defaultColor: productIndex % 2 === 0 ? "#1a1a1a" : "#ffffff",
           defaultView: "front",
           printPosition: "front",

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -8,7 +8,7 @@ import { useViewerStore } from "@/components/viewer/useViewerStore";
 import { useCartStore } from "../store/cartStore";
 import { useAuth } from "../context/AuthContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { PRODUCTS, Product } from "../lib/products";
+import { PRODUCTS, Product, fetchDriveProducts } from "../lib/products";
 import { getGarmentFrontAndBackSnapshots } from "../lib/garmentRenderer";
 import {
   ArrowLeft,
@@ -112,6 +112,7 @@ export default function DesignLabPage() {
   const rotatingPlaceholder = useRotatingPlaceholder();
 
   // Local state controls
+  const [allProducts, setAllProducts] = useState<Product[]>(PRODUCTS);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTool, setActiveTool] = useState<"color" | "garment" | "placement" | "size" | null>(null);
@@ -122,6 +123,30 @@ export default function DesignLabPage() {
   const [wishlistSuccess, setWishlistSuccess] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
   const [showGarmentModal, setShowGarmentModal] = useState(true);
+
+  // Fetch live products
+  useEffect(() => {
+    let isMounted = true;
+    fetchDriveProducts(true).then((data) => {
+      if (isMounted && data.products.length > 0) {
+        setAllProducts(data.products);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredPresets = useMemo(() => {
+    if (!selectedTag || selectedTag === "All") return allProducts;
+    const tagLower = selectedTag.toLowerCase();
+    const matched = allProducts.filter(
+      (p) =>
+        p.category.toLowerCase() === tagLower ||
+        p.tags.some((t) => t.toLowerCase() === tagLower)
+    );
+    return matched.length > 0 ? matched : allProducts;
+  }, [allProducts, selectedTag]);
 
   // Load preset or custom params on mount
   useEffect(() => {
@@ -816,7 +841,7 @@ export default function DesignLabPage() {
 
           {/* Horizontal Preset Carousel Cards */}
           <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-none w-full snap-x snap-mandatory">
-            {PRODUCTS.map((prod, idx) => {
+            {filteredPresets.map((prod, idx) => {
               const active = isPresetActive(prod);
               return (
                 <div
