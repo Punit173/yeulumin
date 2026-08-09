@@ -7,7 +7,7 @@ import { ArrowLeft, Search, MoreVertical, ShoppingBag, Heart, Sparkles, X, Home 
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import GrainOverlay from "../components/GrainOverlay";
-import { PRODUCTS, CATEGORIES, Product } from "../lib/products";
+import { PRODUCTS, CATEGORIES, Product, fetchDriveProducts } from "../lib/products";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import { useCartStore } from "../store/cartStore";
@@ -19,51 +19,65 @@ export default function ProductsPage() {
 
   // States
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [categories, setCategories] = useState<string[]>(CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [cartSuccessId, setCartSuccessId] = useState<string | null>(null);
   const [wishlistedIds, setWishlistedIds] = useState<string[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [dbLoading, setDbLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch db products if supabase is ready
+  // Fetch live products from Google Drive (with Supabase fallback if available)
   useEffect(() => {
-    const fetchDbProducts = async () => {
-      if (!isSupabaseConfigured()) return;
-      setDbLoading(true);
+    let isMounted = true;
+    const loadLiveProducts = async () => {
+      setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const driveData = await fetchDriveProducts();
+        if (isMounted && driveData.products.length > 0) {
+          setProducts(driveData.products);
+          setCategories(driveData.categories);
+          setLoading(false);
+          return;
+        }
 
-        if (error) throw error;
-        if (data && data.length > 0) {
-          const mapped: Product[] = data.map((d: any, idx: number) => ({
-            id: d.id,
-            name: d.name,
-            description: d.description || "",
-            price: Number(d.price),
-            badge: d.badge,
-            image: d.image,
-            category: d.category,
-            tags: d.tags || [],
-            defaultColor: d.default_color,
-            defaultView: d.default_view,
-            printPosition: d.print_position,
-            version: d.version || `Version ${idx + 1}`
-          }));
-          setProducts(mapped);
+        // Supabase secondary check if drive endpoint is empty
+        if (isSupabaseConfigured()) {
+          const { data, error } = await supabase
+            .from("products")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+          if (!error && data && data.length > 0) {
+            const mapped: Product[] = data.map((d: any, idx: number) => ({
+              id: d.id,
+              name: d.name,
+              description: d.description || "",
+              price: Number(d.price),
+              badge: d.badge,
+              image: d.image,
+              category: d.category,
+              tags: d.tags || [],
+              defaultColor: d.default_color,
+              defaultView: d.default_view,
+              printPosition: d.print_position,
+              version: d.version || `Version ${idx + 1}`
+            }));
+            if (isMounted) setProducts(mapped);
+          }
         }
       } catch (err) {
-        console.warn("Failed to load products from database, falling back to static:", err);
+        console.warn("Failed to load products from Google Drive API:", err);
       } finally {
-        setDbLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    fetchDbProducts();
+    loadLiveProducts();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleToggleWishlist = (id: string, e?: React.MouseEvent) => {
@@ -190,7 +204,7 @@ export default function ProductsPage() {
 
         {/* ─── CATEGORY TABS (HORIZONTAL PILLS) ─── */}
         <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none w-full mb-8">
-          {CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const isActive = selectedCategory === cat;
             return (
               <button
@@ -209,7 +223,7 @@ export default function ProductsPage() {
         </div>
 
         {/* ─── DYNAMIC MATRIX GRID ─── */}
-        {dbLoading ? (
+        {loading ? (
           <div className="py-32 flex flex-col items-center justify-center gap-3">
             <Loader2 className="h-8 w-8 text-neutral-400 animate-spin" />
             <span className="text-xs font-mono text-neutral-400 uppercase tracking-widest">
@@ -221,6 +235,7 @@ export default function ProductsPage() {
             {processedProducts.map((product) => {
               const isWishlisted = wishlistedIds.includes(product.id);
               const isMenuOpen = activeMenuId === product.id;
+              const remixUrl = `/customize?preset=${encodeURIComponent(product.id)}&texture=${encodeURIComponent(product.image)}&name=${encodeURIComponent(product.name)}`;
 
               return (
                 <div
@@ -230,12 +245,13 @@ export default function ProductsPage() {
                   <div className="relative">
                     {/* Visual Card Image */}
                     <Link
-                      href={`/customize?preset=${product.id}`}
+                      href={remixUrl}
                       className="aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-2 sm:p-6 block relative"
                     >
                       <img
                         src={product.image}
                         alt={product.name}
+                        referrerPolicy="no-referrer"
                         className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-103"
                       />
                     </Link>

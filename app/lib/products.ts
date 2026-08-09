@@ -5,12 +5,13 @@ export interface Product {
   price: number;
   badge?: "Bestseller" | "New Drop" | "AI Generated";
   image: string;
-  category: "Abstract" | "Minimal" | "Streetwear" | "Vintage" | "Anime";
+  category: string;
   tags: string[];
   defaultColor?: string;
   defaultView?: "front" | "back";
   printPosition?: "front" | "back";
   version?: string;
+  fileId?: string;
 }
 
 export const PRODUCTS: Product[] = [
@@ -185,3 +186,21 @@ export const PRODUCTS: Product[] = [
 ];
 
 export const CATEGORIES = ["All", "Minimal", "Streetwear", "Vintage", "Anime"];
+
+export async function fetchDriveProducts(): Promise<{ categories: string[]; products: Product[] }> {
+  try {
+    const res = await fetch("/api/gdrive");
+    if (!res.ok) throw new Error("GDrive endpoint unreachable");
+    const data = await res.json();
+    if (data.products && data.products.length > 0) {
+      return {
+        categories: data.categories || CATEGORIES,
+        products: data.products,
+      };
+    }
+  } catch (err) {
+    console.warn("Failed to fetch live GDrive collection, using fallback:", err);
+  }
+  return { categories: CATEGORIES, products: PRODUCTS };
+}
+

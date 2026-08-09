@@ -10,6 +10,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import GrainOverlay from "../components/GrainOverlay";
 import { useCartStore } from "../store/cartStore";
+import { getGarmentFrontAndBackSnapshots } from "../lib/garmentRenderer";
 
 interface SavedCustomization {
   id: string;
@@ -80,16 +81,32 @@ export default function UserCollectionPage() {
     }
   };
 
-  const handleAddToCart = (item: SavedCustomization) => {
+  const handleAddToCart = async (item: SavedCustomization) => {
+    const isHoodieItem = item.name.toLowerCase().includes("hoodie") || (item.description && item.description.toLowerCase().includes("hoodie"));
+    const garmentType = isHoodieItem ? "hoodie" : "tshirt";
+    const snapshots = await getGarmentFrontAndBackSnapshots(
+      item.color,
+      garmentType,
+      item.custom_texture_url,
+      (item.decal_target as any) || "front",
+      item.decal_scale || 0.35,
+      item.decal_pos_x || 0,
+      item.decal_pos_y || 0.05,
+      "front",
+      item.design
+    );
+
     addItem({
       id: `configured-${item.id}-${Date.now()}`,
       name: item.name,
       description: item.description || "Bespoke customized streetwear design.",
-      price: 999, // Custom items are ₹999
+      price: isHoodieItem ? 1999 : 999,
       quantity: 1,
-      size: "M", // default size
+      size: "M",
       color: item.color,
-      image: item.custom_texture_url || "/tshirt-blank.png", // Decal texture URL or a blank t-shirt fallback
+      image: snapshots.front,
+      backImage: snapshots.back,
+      prompt: item.custom_prompt || undefined,
       style: item.design,
     });
 

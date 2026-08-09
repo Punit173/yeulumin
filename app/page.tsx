@@ -7,7 +7,7 @@ import { Sparkles, ShoppingBag, Heart, Search, SlidersHorizontal, Home as HomeIc
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import GrainOverlay from "./components/GrainOverlay";
-import { PRODUCTS, Product } from "./lib/products";
+import { PRODUCTS, Product, fetchDriveProducts, CATEGORIES } from "./lib/products";
 import { useAuth } from "./context/AuthContext";
 import { useCartStore } from "./store/cartStore";
 
@@ -24,11 +24,27 @@ export default function HomePage() {
   const addItem = useCartStore((state) => state.addItem);
 
   // States
+  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [categories, setCategories] = useState<string[]>(CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [cartSuccessId, setCartSuccessId] = useState<string | null>(null);
   const [wishlistedIds, setWishlistedIds] = useState<string[]>([]);
   const [heroSlide, setHeroSlide] = useState(0);
+
+  // Load live products from Google Drive
+  useEffect(() => {
+    let isMounted = true;
+    fetchDriveProducts().then((data) => {
+      if (isMounted && data.products.length > 0) {
+        setProducts(data.products);
+        setCategories(data.categories);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Auto slide dots indicator simulation
   useEffect(() => {
@@ -73,7 +89,7 @@ export default function HomePage() {
 
   // Filtered products list
   const filteredProducts = useMemo(() => {
-    let result = [...PRODUCTS];
+    let result = [...products];
 
     if (selectedCategory !== "All") {
       result = result.filter(
@@ -93,7 +109,7 @@ export default function HomePage() {
     }
 
     return result;
-  }, [selectedCategory, searchQuery]);
+  }, [products, selectedCategory, searchQuery]);
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#F5F6F8] text-[#0A0A0A] overflow-hidden antialiased">
@@ -244,7 +260,7 @@ export default function HomePage() {
             
             {/* Category pills */}
             <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto scrollbar-none">
-              {["All", "Minimal", "Streetwear", "Vintage", "Anime"].map((cat) => {
+              {categories.map((cat) => {
                 const isActive = selectedCategory === cat;
                 return (
                   <button
@@ -305,6 +321,7 @@ export default function HomePage() {
                         <img
                           src={product.image}
                           alt={product.name}
+                          referrerPolicy="no-referrer"
                           className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-103"
                         />
 

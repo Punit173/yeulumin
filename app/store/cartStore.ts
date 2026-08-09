@@ -8,7 +8,8 @@ export interface CartItem {
   description: string;
   price: number;
   quantity: number;
-  image: string;
+  image: string; // Front view
+  backImage?: string; // Back view
   size: "XS" | "S" | "M" | "L" | "XL" | "XXL";
   color: string; // e.g., "#0A0A0A" or "#FFFFFF"
   prompt?: string;

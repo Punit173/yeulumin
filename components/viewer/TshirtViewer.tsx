@@ -32,7 +32,8 @@ export default function TshirtViewer({
   return (
     <div className="relative w-full h-full bg-transparent cursor-grab active:cursor-grabbing">
       <Canvas
-        gl={{ antialias: true }}
+        id="tshirt-canvas"
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
         dpr={[1, 2]}
         camera={{ position: [0, 0.5, cameraDistance], fov: 45 }}
       >

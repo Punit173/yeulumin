@@ -69,13 +69,33 @@ export default function CartPage() {
                 >
                   {/* Left Column: Image & Details */}
                   <div className="flex items-center gap-4">
-                    {/* Item Image */}
-                    <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl bg-[#F9FAFB] border border-neutral-100 overflow-hidden flex-shrink-0 flex items-center justify-center p-2 relative">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="max-h-full max-w-full object-contain"
-                      />
+                    {/* Item Front & Back Images */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Front View Box */}
+                      <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl bg-[#F9FAFB] border border-neutral-200 overflow-hidden flex flex-col items-center justify-center p-1.5 relative shadow-sm">
+                        <img
+                          src={item.image}
+                          alt={`${item.name} Front View`}
+                          className="max-h-[82%] max-w-full object-contain"
+                        />
+                        <span className="absolute bottom-1 bg-black/80 text-white text-[8px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded backdrop-blur-xs leading-none">
+                          FRONT
+                        </span>
+                      </div>
+
+                      {/* Back View Box */}
+                      {item.backImage && (
+                        <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-xl bg-[#F9FAFB] border border-neutral-200 overflow-hidden flex flex-col items-center justify-center p-1.5 relative shadow-sm">
+                          <img
+                            src={item.backImage}
+                            alt={`${item.name} Back View`}
+                            className="max-h-[82%] max-w-full object-contain"
+                          />
+                          <span className="absolute bottom-1 bg-black/80 text-white text-[8px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded backdrop-blur-xs leading-none">
+                            BACK
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Item Specs */}

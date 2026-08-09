@@ -67,7 +67,7 @@ export default function AdminPage() {
     price: 999,
     badge: "New Drop" as "Bestseller" | "New Drop" | "AI Generated",
     image: "",
-    category: "Abstract" as "Abstract" | "Minimal" | "Streetwear" | "Vintage" | "Anime",
+    category: "Minimal" as string,
     tagsString: "",
     defaultColor: "#ffffff",
     defaultView: "front" as "front" | "back",

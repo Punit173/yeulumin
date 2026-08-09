@@ -9,6 +9,7 @@ import { useCartStore } from "../store/cartStore";
 import { useAuth } from "../context/AuthContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { PRODUCTS, Product } from "../lib/products";
+import { getGarmentFrontAndBackSnapshots } from "../lib/garmentRenderer";
 import {
   ArrowLeft,
   Sparkles,
@@ -126,6 +127,8 @@ export default function DesignLabPage() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const presetId = searchParams.get("preset");
+    const textureParam = searchParams.get("texture");
+    const nameParam = searchParams.get("name");
     const garmentParam = searchParams.get("garment");
 
     if (garmentParam === "hoodie" || garmentParam === "tshirt" || garmentParam === "oversized") {
@@ -133,24 +136,38 @@ export default function DesignLabPage() {
       setShowGarmentModal(false);
     }
 
-    if (presetId) {
-      const product = PRODUCTS.find((p) => p.id === presetId);
-      if (product) {
-        if (product.defaultColor) setColor(product.defaultColor);
-        if (product.image) {
-          setCustomTextureUrl(product.image);
-          setCustomPrompt(product.description);
-          setDesign("ai");
-        }
-        if (product.defaultView) setView(product.defaultView);
-        if (product.printPosition) setDecalTarget(product.printPosition);
-        
-        // Check if preset is a hoodie
-        const nameLower = product.name.toLowerCase();
-        const descLower = product.description.toLowerCase();
-        if (nameLower.includes("hoodie") || descLower.includes("hoodie")) {
-          setGarmentType("hoodie");
-          setShowGarmentModal(false);
+    if (textureParam) {
+      setCustomTextureUrl(textureParam);
+      setCustomPrompt(nameParam ? decodeURIComponent(nameParam) : "Custom Streetwear Graphic");
+      setDesign("ai");
+      setShowGarmentModal(false);
+    } else if (presetId) {
+      if (presetId.startsWith("gdrive-")) {
+        const fileId = presetId.replace("gdrive-", "");
+        const driveImageUrl = `/api/gdrive/image?id=${fileId}`;
+        setCustomTextureUrl(driveImageUrl);
+        setCustomPrompt(nameParam ? decodeURIComponent(nameParam) : "Custom Streetwear Graphic");
+        setDesign("ai");
+        setShowGarmentModal(false);
+      } else {
+        const product = PRODUCTS.find((p) => p.id === presetId);
+        if (product) {
+          if (product.defaultColor) setColor(product.defaultColor);
+          if (product.image) {
+            setCustomTextureUrl(product.image);
+            setCustomPrompt(product.description);
+            setDesign("ai");
+          }
+          if (product.defaultView) setView(product.defaultView);
+          if (product.printPosition) setDecalTarget(product.printPosition);
+          
+          // Check if preset is a hoodie
+          const nameLower = product.name.toLowerCase();
+          const descLower = product.description.toLowerCase();
+          if (nameLower.includes("hoodie") || descLower.includes("hoodie")) {
+            setGarmentType("hoodie");
+            setShowGarmentModal(false);
+          }
         }
       }
     }
@@ -192,13 +209,26 @@ export default function DesignLabPage() {
   };
 
   // Add custom design to shopping cart
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!user) {
       router.push(`/auth?redirect=/customize`);
       return;
     }
 
     setCartSuccess(true);
+    const activeDecalUrl = customTextureUrl || (design === "logo" ? "/logos/trimmed_yeulumin ai-05.png" : null);
+    const snapshots = await getGarmentFrontAndBackSnapshots(
+      color,
+      garmentType,
+      activeDecalUrl,
+      decalTarget,
+      decalScale,
+      decalPosX,
+      decalPosY,
+      view === "back" ? "back" : "front",
+      design
+    );
+
     addItem({
       id: `custom-lab-${Date.now()}`,
       name: `Custom ${selectedTag} ${garmentType === "hoodie" ? "Hoodie" : garmentType === "oversized" ? "Oversized Tee" : "Tee"}`,
@@ -207,7 +237,9 @@ export default function DesignLabPage() {
       quantity: 1,
       size: size,
       color: color,
-      image: customTextureUrl || "/tshirt-blank.png",
+      image: snapshots.front,
+      backImage: snapshots.back,
+      prompt: customPrompt || prompt || "",
       style: selectedTag,
     });
 
@@ -229,13 +261,25 @@ export default function DesignLabPage() {
     setWishlistSuccess(true);
 
     try {
+      const activeDecalUrl = customTextureUrl || (design === "logo" ? "/logos/trimmed_yeulumin ai-05.png" : null);
+      const snapshots = await getGarmentFrontAndBackSnapshots(
+        color,
+        garmentType,
+        activeDecalUrl,
+        decalTarget,
+        decalScale,
+        decalPosX,
+        decalPosY,
+        view === "back" ? "back" : "front",
+        design
+      );
       const { error } = await supabase.from("customizations").insert({
         user_id: user.id,
         name: `Bespoke ${selectedTag} ${garmentType === "hoodie" ? "Hoodie" : garmentType === "oversized" ? "Oversized Tee" : "Tee"}`,
         description: prompt || `Bespoke customized streetwear ${garmentType === "hoodie" ? "hoodie" : garmentType === "oversized" ? "oversized tee" : "garment"}.`,
         color,
         design: selectedTag.toLowerCase(),
-        custom_texture_url: customTextureUrl,
+        custom_texture_url: snapshots.front,
         custom_prompt: prompt,
         decal_scale: decalScale,
         decal_pos_x: decalPosX,
