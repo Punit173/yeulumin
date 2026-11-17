@@ -11,6 +11,7 @@ import Footer from "../components/Footer";
 import GrainOverlay from "../components/GrainOverlay";
 import { useCartStore } from "../store/cartStore";
 import { getGarmentFrontAndBackSnapshots } from "../lib/garmentRenderer";
+import SizePickerModal, { type SizeOption } from "../components/SizePickerModal";
 
 interface SavedCustomization {
   id: string;
@@ -35,6 +36,7 @@ export default function UserCollectionPage() {
 
   const addItem = useCartStore((state) => state.addItem);
   const [cartSuccessId, setCartSuccessId] = useState<string | null>(null);
+  const [sizeFor, setSizeFor] = useState<SavedCustomization | null>(null); // item waiting for a size choice
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -81,7 +83,11 @@ export default function UserCollectionPage() {
     }
   };
 
-  const handleAddToCart = async (item: SavedCustomization) => {
+  // Ask for a size first, then add
+  const handleAddToCart = (item: SavedCustomization) => setSizeFor(item);
+
+  const addToCartWithSize = async (item: SavedCustomization, size: SizeOption) => {
+    setSizeFor(null);
     const isHoodieItem = item.name.toLowerCase().includes("hoodie") || (item.description && item.description.toLowerCase().includes("hoodie"));
     const garmentType = isHoodieItem ? "hoodie" : "tshirt";
     const snapshots = await getGarmentFrontAndBackSnapshots(
@@ -102,7 +108,7 @@ export default function UserCollectionPage() {
       description: item.description || "Bespoke customized streetwear design.",
       price: isHoodieItem ? 1999 : 999,
       quantity: 1,
-      size: "M",
+      size,
       color: item.color,
       image: snapshots.front,
       backImage: snapshots.back,
@@ -135,6 +141,15 @@ export default function UserCollectionPage() {
   return (
     <div className="relative min-h-screen flex flex-col bg-[#F5F6F8] text-[#0A0A0A] antialiased">
       <GrainOverlay />
+      {sizeFor && (
+        <SizePickerModal
+          title={sizeFor.name}
+          image={sizeFor.custom_texture_url || undefined}
+          price={sizeFor.name.toLowerCase().includes("hoodie") ? 1999 : 999}
+          onConfirm={(size) => addToCartWithSize(sizeFor, size)}
+          onClose={() => setSizeFor(null)}
+        />
+      )}
       <Navbar />
 
       <main className="flex-grow mx-auto max-w-7xl w-full px-4 sm:px-6 lg:px-8 py-12">
@@ -164,13 +179,15 @@ export default function UserCollectionPage() {
                 >
                   <div>
                     {/* Image wrapper */}
-                    <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-2 sm:p-8">
+                    <div className="relative aspect-square w-full bg-[#F5F6F8] overflow-hidden flex items-center justify-center">
                       {/* Avatar preview decal or default */}
                       {item.custom_texture_url ? (
                         <img
                           src={item.custom_texture_url}
                           alt={item.name}
-                          className="max-h-full max-w-full object-contain rounded border border-neutral-100 transition-transform duration-500 group-hover:scale-103 bg-white"
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-103"
                         />
                       ) : (
                         <div className="flex flex-col items-center gap-1 sm:gap-2 text-neutral-400">

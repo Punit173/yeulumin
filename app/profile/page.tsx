@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { PRODUCTS } from "../lib/products";
+import { useAddProductToCart } from "../components/SizePickerModal";
 import {
   User as UserIcon,
   Sparkles,
@@ -31,6 +32,7 @@ import GrainOverlay from "../components/GrainOverlay";
 export default function ProfilePage() {
   const { user, profile, loading, signOut } = useAuth();
   const router = useRouter();
+  const { requestAdd, sizePicker, addedId } = useAddProductToCart("/profile");
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F9FAFB] text-neutral-900 antialiased pb-24 md:pb-0">
       <GrainOverlay />
+      {sizePicker}
       
       <Navbar />
 
@@ -227,13 +230,15 @@ export default function ProfilePage() {
                     </h4>
                     <span className="text-[9px] text-neutral-400 font-mono">₹{prod.price}</span>
                   </div>
-                  <Link
-                    href={`/customize?preset=${prod.id}`}
-                    className="h-7 w-7 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                    title="Load Design"
+                  <button
+                    type="button"
+                    onClick={(e) => requestAdd(prod, e)}
+                    className="h-7 px-2.5 rounded-full bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white flex items-center justify-center gap-1 transition-colors cursor-pointer text-[9px] font-bold uppercase tracking-wider"
+                    title="Add to cart"
                   >
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
+                    <ShoppingBag className="h-3.5 w-3.5" />
+                    {addedId === prod.id ? "Added" : "Add"}
+                  </button>
                 </div>
               </div>
             ))}

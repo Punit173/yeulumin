@@ -1,3 +1,5 @@
+import { captureGarmentViews } from "@/components/viewer/snapshotRegistry";
+
 export async function renderGarment2DView(
   shirtColor: string,
   garmentType: "tshirt" | "hoodie" | "oversized" = "tshirt",
@@ -165,6 +167,11 @@ export async function getGarmentFrontAndBackSnapshots(
   currentView: "front" | "back" = "front",
   designId: string = "ai"
 ): Promise<{ front: string; back: string }> {
+  // Preferred: real front & back renders of the 3D garment exactly as designed
+  const live = captureGarmentViews(512);
+  if (live) return live;
+
+  // Fallback (no 3D viewer on screen): simplified 2D drawings
   let frontSnapshot = await renderGarment2DView(
     color,
     garmentType,

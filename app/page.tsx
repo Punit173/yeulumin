@@ -2,14 +2,12 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Sparkles, ShoppingBag, Heart, Search, SlidersHorizontal, Home as HomeIcon, Image as GalleryIcon, User, Menu, X, ArrowLeft, ChevronLeft, ChevronRight, Tag, ArrowRight } from "lucide-react";
+import { Sparkles, ShoppingBag, Heart, SlidersHorizontal, Home as HomeIcon, Image as GalleryIcon, User, Menu, X, ArrowLeft, ChevronLeft, ChevronRight, Tag, ArrowRight } from "lucide-react";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import GrainOverlay from "./components/GrainOverlay";
-import { PRODUCTS, Product, fetchDriveProducts, CATEGORIES } from "./lib/products";
-import { useAuth } from "./context/AuthContext";
-import { useCartStore } from "./store/cartStore";
+import { PRODUCTS, Product, fetchDriveProducts, CATEGORIES, thumbnailUrl } from "./lib/products";
+import { useAddProductToCart } from "./components/SizePickerModal";
 
 const HERO_IMAGES = [
   "/landing_page/ChatGPT Image Jun 30, 2026, 11_23_11 AM.png",
@@ -19,16 +17,13 @@ const HERO_IMAGES = [
 ];
 
 export default function HomePage() {
-  const { user } = useAuth();
-  const router = useRouter();
-  const addItem = useCartStore((state) => state.addItem);
+  // Catalog designs can only be bought (not customized): add-to-cart asks for a size first
+  const { requestAdd, sizePicker, addedId } = useAddProductToCart("/");
 
   // States
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
   const [categories, setCategories] = useState<string[]>(CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [cartSuccessId, setCartSuccessId] = useState<string | null>(null);
   const [wishlistedIds, setWishlistedIds] = useState<string[]>([]);
   const [heroSlide, setHeroSlide] = useState(0);
 
@@ -62,30 +57,6 @@ export default function HomePage() {
     );
   };
 
-  const handleAddToCart = (product: Product, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!user) {
-      router.push(`/auth?redirect=/`);
-      return;
-    }
-
-    addItem({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      quantity: 1,
-      size: "M",
-      color: product.defaultColor || "#ffffff",
-      image: product.image,
-      style: product.printPosition || "front",
-    });
-
-    setCartSuccessId(product.id);
-    setTimeout(() => setCartSuccessId(null), 2500);
-  };
 
   // Filtered products list
   const filteredProducts = useMemo(() => {
@@ -98,22 +69,13 @@ export default function HomePage() {
       );
     }
 
-    if (searchQuery.trim() !== "") {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.description.toLowerCase().includes(q) ||
-          p.tags.some((t) => t.toLowerCase().includes(q))
-      );
-    }
-
     return result;
-  }, [products, selectedCategory, searchQuery]);
+  }, [products, selectedCategory]);
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#F5F6F8] text-[#0A0A0A] overflow-hidden antialiased">
       <GrainOverlay />
+      {sizePicker}
       
       {/* Desktop Header Navbar */}
       <Navbar />
@@ -255,11 +217,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Filter Bar & Search Row */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mb-8">
-            
-            {/* Category pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto scrollbar-none">
+          {/* Category filter row */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 w-full scrollbar-none">
               {categories.map((cat) => {
                 const isActive = selectedCategory === cat;
                 return (
@@ -278,18 +238,6 @@ export default function HomePage() {
               })}
             </div>
 
-            {/* Search Input Box */}
-            <div className="hidden sm:block relative w-full sm:max-w-xs">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search styles"
-                className="w-full bg-white border border-neutral-200 focus:border-neutral-400 rounded-xl py-2 pl-9 pr-4 text-xs text-neutral-700 placeholder-neutral-400 focus:outline-none transition-all shadow-sm"
-              />
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-neutral-400" />
-            </div>
-
           </div>
 
           {/* Catalog products list cards */}
@@ -304,7 +252,7 @@ export default function HomePage() {
                   >
                     <div>
                       {/* Image container */}
-                      <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-2 sm:p-6">
+                      <div className="relative aspect-square w-full bg-[#F9FAFB] overflow-hidden">
                         
                         {/* Custom Wishlist heart trigger */}
                         <button
@@ -318,11 +266,14 @@ export default function HomePage() {
                           <Heart className="h-3 w-3 sm:h-4 sm:w-4" />
                         </button>
 
+                        {/* Fills the card edge to edge; the slight zoom trims thin border lines baked into some photos */}
                         <img
-                          src={product.image}
+                          src={thumbnailUrl(product.image)}
                           alt={product.name}
+                          loading="lazy"
+                          decoding="async"
                           referrerPolicy="no-referrer"
-                          className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-103"
+                          className="absolute inset-0 h-full w-full object-cover scale-[1.03] transition-transform duration-500 group-hover:scale-[1.07]"
                         />
 
 
@@ -347,12 +298,12 @@ export default function HomePage() {
                     {/* Bottom Actions footer */}
                     <div className="px-2 pb-2 sm:px-6 sm:pb-6 pt-0 flex gap-3">
                       <button
-                        onClick={(e) => handleAddToCart(product, e)}
+                        onClick={(e) => requestAdd(product, e)}
                         className="w-full py-1.5 sm:py-2.5 bg-[#111111] hover:bg-black text-white text-[9px] sm:text-xs font-bold rounded-lg sm:rounded-xl flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer shadow-sm"
                       >
                         <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4" />
-                        <span className="hidden sm:inline">{cartSuccessId === product.id ? "Added!" : "Add to Cart"}</span>
-                        <span className="inline sm:hidden">{cartSuccessId === product.id ? "Added!" : "Add"}</span>
+                        <span className="hidden sm:inline">{addedId === product.id ? "Added!" : "Add to Cart"}</span>
+                        <span className="inline sm:hidden">{addedId === product.id ? "Added!" : "Add"}</span>
                       </button>
                     </div>
 

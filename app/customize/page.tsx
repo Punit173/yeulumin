@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -8,7 +8,8 @@ import { useViewerStore } from "@/components/viewer/useViewerStore";
 import { useCartStore } from "../store/cartStore";
 import { useAuth } from "../context/AuthContext";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { PRODUCTS, Product, fetchDriveProducts } from "../lib/products";
+import { isCatalogDesignUrl } from "../lib/products";
+import SizePickerModal, { type SizeOption } from "../components/SizePickerModal";
 import { getGarmentFrontAndBackSnapshots } from "../lib/garmentRenderer";
 import {
   ArrowLeft,
@@ -32,9 +33,23 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  FolderHeart
+  FolderHeart,
+  Upload,
+  X,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  Plus,
+  Minus,
+  RotateCcw,
+  Trash2,
+  Crop,
+  Loader2
 } from "lucide-react";
 import GrainOverlay from "../components/GrainOverlay";
+import ImageCropModal from "../components/ImageCropModal";
+import { captureDesignSnapshot, saveDesignSnapshot, loadDesignSnapshot } from "../lib/designSnapshots";
+import type { DesignSource } from "@/components/viewer/useViewerStore";
 
 // Dynamically import 3D Viewer to disable SSR (Window and WebGL references)
 const TshirtViewer = dynamic(() => import("@/components/viewer/TshirtViewer"), {
@@ -60,6 +75,78 @@ const PROMPT_SUGGESTIONS = [
   "Abstract streetwear graffiti art with bold splashes.",
 ];
 
+// Placement limits (shared by the on-stage placement panel)
+const POS_X_RANGE: [number, number] = [-0.1, 0.1];
+const POS_Y_RANGE: [number, number] = [-0.1, 0.2];
+const SCALE_RANGE: [number, number] = [0.1, 0.6];
+const clamp = (v: number, [min, max]: [number, number]) =>
+  Math.round(Math.min(max, Math.max(min, v)) * 1000) / 1000;
+
+// Button that repeats its action while held down (press-and-hold to keep nudging)
+function HoldButton({
+  onStep,
+  title,
+  children,
+  className = "h-9 w-9",
+}: {
+  onStep: () => void;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const interval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stop = () => {
+    if (timer.current) clearTimeout(timer.current);
+    if (interval.current) clearInterval(interval.current);
+    timer.current = null;
+    interval.current = null;
+  };
+
+  useEffect(() => stop, []);
+
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        onStep();
+        timer.current = setTimeout(() => {
+          interval.current = setInterval(onStep, 70);
+        }, 350);
+      }}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onStep();
+        }
+      }}
+      className={`rounded-lg bg-neutral-100 hover:bg-blue-50 hover:text-blue-600 active:bg-blue-100 text-neutral-700 flex items-center justify-center transition-colors cursor-pointer touch-none select-none ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Fabric colour context for the prompt refiner: swatch name (if any), hex and light/dark tone
+function describeFabric(hex: string) {
+  const swatch = COLOR_SWATCHES.find((s) => s.hex.toLowerCase() === hex.toLowerCase());
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  let tone: "light" | "dark" | undefined;
+  if (m) {
+    const n = parseInt(m[1], 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    tone = 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "light" : "dark";
+  }
+  return { hex: m ? `#${m[1]}` : hex, name: swatch?.name, tone };
+}
+
 function useRotatingPlaceholder() {
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
 
@@ -77,6 +164,8 @@ export default function DesignLabPage() {
   const { user } = useAuth();
   const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
+  const updateCartItem = useCartStore((state) => state.updateItem);
+  const cartItems = useCartStore((state) => state.items);
 
   // States from store
   const {
@@ -87,6 +176,7 @@ export default function DesignLabPage() {
     quantity,
     customTextureUrl,
     customPrompt,
+    designSource,
     decalScale,
     decalPosY,
     decalPosX,
@@ -99,6 +189,7 @@ export default function DesignLabPage() {
     setQuantity,
     setCustomTextureUrl,
     setCustomPrompt,
+    setDesignSource,
     addToHistory,
     setDecalScale,
     setDecalPosY,
@@ -112,47 +203,262 @@ export default function DesignLabPage() {
   const rotatingPlaceholder = useRotatingPlaceholder();
 
   // Local state controls
-  const [allProducts, setAllProducts] = useState<Product[]>(PRODUCTS);
   const [prompt, setPrompt] = useState("");
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  // Keep the prompt box sized to its content, also when text is set programmatically (e.g. a refinement)
+  useEffect(() => {
+    const el = promptRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    el.style.overflowY = el.scrollHeight > 120 ? "auto" : "hidden";
+  }, [prompt]);
+
+  // ── Refine prompt with Gemini ──
+  type Refinement = { refined: string; suggestions: string[]; tips: string[] };
+  const [refining, setRefining] = useState(false);
+  const [refinement, setRefinement] = useState<Refinement | null>(null);
+  const [refineError, setRefineError] = useState<string | null>(null);
+  const [promptBeforeRefine, setPromptBeforeRefine] = useState<string | null>(null);
+  const [appliedRefinement, setAppliedRefinement] = useState<string | null>(null);
+  const refinePanelRef = useRef<HTMLDivElement>(null);
+
+  // On small screens the suggestions open below the fold: bring them into view
+  useEffect(() => {
+    if (refinement) refinePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [refinement]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTool, setActiveTool] = useState<"color" | "garment" | "placement" | "size" | null>(null);
   const [selectedTag, setSelectedTag] = useState("Cyberpunk");
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(false);
   const [zoomLevel, setZoomLevel] = useState("wide"); // wide, close
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const [wishlistSuccess, setWishlistSuccess] = useState(false);
   const [cartSuccess, setCartSuccess] = useState(false);
   const [showGarmentModal, setShowGarmentModal] = useState(true);
+  // Upload-to-model (decal) state
+  const [isUploading, setIsUploading] = useState(false);
+  const [showPlacement, setShowPlacement] = useState(false);
 
-  // Fetch live products
-  useEffect(() => {
-    let isMounted = true;
-    fetchDriveProducts(true).then((data) => {
-      if (isMounted && data.products.length > 0) {
-        setAllProducts(data.products);
-      }
+  // When a cart item is reopened for editing, its id is kept here (and in sessionStorage so a reload keeps it)
+  const EDITING_KEY = "yeulumin-editing-cart-item";
+  const [editingCartId, setEditingCartIdState] = useState<string | null>(null);
+  const setEditingCartId = (id: string | null) => {
+    setEditingCartIdState(id);
+    try {
+      if (id) sessionStorage.setItem(EDITING_KEY, id);
+      else sessionStorage.removeItem(EDITING_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const editingItem = editingCartId ? cartItems.find((i) => i.id === editingCartId) ?? null : null;
+
+  // Crop / rounded-corner editor session
+  const [cropSession, setCropSession] = useState<{
+    source: DesignSource;
+    target: "front" | "back";
+    name: string;
+  } | null>(null);
+
+  const applyCroppedImage = (dataUrl: string, source: DesignSource) => {
+    if (!cropSession) return;
+    const { target, name } = cropSession;
+    setCustomTextureUrl(dataUrl); // (clears designSource, so set it after)
+    setDesignSource(source);
+    setCustomPrompt(name);
+    addToHistory(dataUrl);
+    setDesign("ai");
+    setDecalTarget(target);
+    setView(target);
+    setShowPlacement(true); // let the user fine-tune right away
+    setCropSession(null);
+  };
+
+  // Re-open the editor for the design currently on the garment
+  const openCropForCurrent = () => {
+    if (!customTextureUrl) return;
+    setCropSession({
+      source: designSource ?? { src: customTextureUrl, crop: null, radius: 0, aspect: "free" },
+      target: decalTarget,
+      name: customPrompt || "Custom Design",
     });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  };
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const hasDesign = !!customTextureUrl || design !== "none";
 
-  const filteredPresets = useMemo(() => {
-    if (!selectedTag || selectedTag === "All") return allProducts;
-    const tagLower = selectedTag.toLowerCase();
-    const matched = allProducts.filter(
-      (p) =>
-        p.category.toLowerCase() === tagLower ||
-        p.tags.some((t) => t.toLowerCase() === tagLower)
-    );
-    return matched.length > 0 ? matched : allProducts;
-  }, [allProducts, selectedTag]);
-
-  // Load preset or custom params on mount
+  // Auto-cancel the delete confirmation after a few seconds
   useEffect(() => {
+    if (!confirmDelete) return;
+    const t = setTimeout(() => setConfirmDelete(false), 3000);
+    return () => clearTimeout(t);
+  }, [confirmDelete]);
+
+  // Remove the current design (also from the saved/cached copy) so the user can start over.
+  // Garment type and fabric color are kept.
+  const handleDeleteDesign = () => {
+    setCustomTextureUrl(null);
+    setCustomPrompt(null);
+    setDesign("none");
+    resetDecalPlacement();
+    setView("front");
+    setShowPlacement(false);
+    setConfirmDelete(false);
+    // Drop ?texture= / ?preset= so a reload doesn't bring the old design back
+    if (window.location.search) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  };
+  const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
+  const modelFileInputRef = useRef<HTMLInputElement>(null);
+  const pendingUploadTarget = useRef<"front" | "back">("front");
+
+  // Prompt reference image state
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceName, setReferenceName] = useState("");
+  const refFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Validate, read and downscale an image file into a data URL
+  const fileToDataUrl = async (
+    file: File,
+    mime: "image/png" | "image/jpeg" = "image/png",
+    max = 1024,
+    square = false // pad onto a transparent square so prints never stretch on the garment
+  ): Promise<string> => {
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Please upload an image file (PNG, JPG, WEBP, SVG).");
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error("Image is too large. Please upload an image under 10MB.");
+    }
+
+    const originalUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Could not read that image. Please try another file."));
+      el.src = originalUrl;
+    });
+
+    const w = img.naturalWidth || max;
+    const h = img.naturalHeight || max;
+    const ratio = Math.min(1, max / Math.max(w, h));
+    const drawW = Math.max(1, Math.round(w * ratio));
+    const drawH = Math.max(1, Math.round(h * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = square ? Math.max(drawW, drawH) : drawW;
+    canvas.height = square ? Math.max(drawW, drawH) : drawH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas not supported in this browser.");
+    if (mime === "image/jpeg") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.drawImage(img, (canvas.width - drawW) / 2, (canvas.height - drawH) / 2, drawW, drawH);
+    return canvas.toDataURL(mime, 0.9);
+  };
+
+  // Open file picker for placing an image on the model at the chosen side
+  const startModelUpload = (target: "front" | "back") => {
+    pendingUploadTarget.current = target;
+    setUploadMenuOpen(false);
+    modelFileInputRef.current?.click();
+  };
+
+  // Apply an uploaded image directly to the 3D model (front or back)
+  const handleModelImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      // Keep a larger original so cropping still has detail; PNG preserves transparency
+      const dataUrl = await fileToDataUrl(file, "image/png", 2048, false);
+      setCropSession({
+        source: { src: dataUrl, crop: null, radius: 0, aspect: "free" },
+        target: pendingUploadTarget.current,
+        name: file.name.replace(/\.[^.]+$/, "") || "Uploaded Design",
+      });
+    } catch (err: any) {
+      console.error("Image upload failed:", err);
+      alert(err?.message || "Failed to load that image. Please try another file.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Attach a reference image that guides AI generation
+  const handleReferenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    try {
+      const dataUrl = await fileToDataUrl(file, "image/jpeg", 768); // smaller payload for the API
+      setReferenceImage(dataUrl);
+      setReferenceName(file.name);
+    } catch (err: any) {
+      console.error("Reference image failed:", err);
+      alert(err?.message || "Failed to load that image. Please try another file.");
+    }
+  };
+
+
+  // Load preset or custom params on mount (after the saved design is restored, so URL params win)
+  useEffect(() => {
+    const applyParams = () => {
+    const state = useViewerStore.getState();
+    if (state.customTextureUrl && isCatalogDesignUrl(state.customTextureUrl)) {
+      useViewerStore.setState({ customTextureUrl: null, designSource: null, design: "none" });
+    }
+    if (state.garmentChosen || state.customTextureUrl || state.design !== "none") {
+      setShowGarmentModal(false); // a saved garment/design was restored
+    }
+
     const searchParams = new URLSearchParams(window.location.search);
-    const presetId = searchParams.get("preset");
-    const textureParam = searchParams.get("texture");
+
+    // Reopen a design from the cart: /customize?edit=<cartItemId>
+    const editId = searchParams.get("edit");
+    if (editId) {
+      const item = useCartStore.getState().items.find((i) => i.id === editId);
+      loadDesignSnapshot(item?.designId ?? editId).then((snap) => {
+        if (!snap) {
+          alert("Sorry, the saved design for this cart item could not be found on this device.");
+          return;
+        }
+        const { style, ...viewerFields } = snap;
+        useViewerStore.setState({ ...viewerFields, garmentChosen: true });
+        if (style) setSelectedTag(style);
+        setEditingCartId(editId);
+        setShowGarmentModal(false);
+      });
+      // Drop the param so a reload keeps the user's in-progress edits instead of reloading the snapshot
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+
+    // Still editing a cart item after a reload?
+    try {
+      const pendingEdit = sessionStorage.getItem(EDITING_KEY);
+      if (pendingEdit && useCartStore.getState().items.some((i) => i.id === pendingEdit)) {
+        setEditingCartIdState(pendingEdit);
+      } else if (pendingEdit) {
+        sessionStorage.removeItem(EDITING_KEY);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+    // Catalog (Google Drive) designs are buy-only: they are never loaded into the Design Lab
+    const rawTexture = searchParams.get("texture");
+    const textureParam = rawTexture && !isCatalogDesignUrl(rawTexture) ? rawTexture : null;
     const nameParam = searchParams.get("name");
     const garmentParam = searchParams.get("garment");
 
@@ -166,37 +472,55 @@ export default function DesignLabPage() {
       setCustomPrompt(nameParam ? decodeURIComponent(nameParam) : "Custom Streetwear Graphic");
       setDesign("ai");
       setShowGarmentModal(false);
-    } else if (presetId) {
-      if (presetId.startsWith("gdrive-")) {
-        const fileId = presetId.replace("gdrive-", "");
-        const driveImageUrl = `/api/gdrive/image?id=${fileId}`;
-        setCustomTextureUrl(driveImageUrl);
-        setCustomPrompt(nameParam ? decodeURIComponent(nameParam) : "Custom Streetwear Graphic");
-        setDesign("ai");
-        setShowGarmentModal(false);
-      } else {
-        const product = PRODUCTS.find((p) => p.id === presetId);
-        if (product) {
-          if (product.defaultColor) setColor(product.defaultColor);
-          if (product.image) {
-            setCustomTextureUrl(product.image);
-            setCustomPrompt(product.description);
-            setDesign("ai");
-          }
-          if (product.defaultView) setView(product.defaultView);
-          if (product.printPosition) setDecalTarget(product.printPosition);
-          
-          // Check if preset is a hoodie
-          const nameLower = product.name.toLowerCase();
-          const descLower = product.description.toLowerCase();
-          if (nameLower.includes("hoodie") || descLower.includes("hoodie")) {
-            setGarmentType("hoodie");
-            setShowGarmentModal(false);
-          }
-        }
-      }
     }
+    };
+
+    if (useViewerStore.persist.hasHydrated()) {
+      applyParams();
+      return;
+    }
+    return useViewerStore.persist.onFinishHydration(() => applyParams());
   }, [setColor, setCustomTextureUrl, setCustomPrompt, setDesign, setView, setDecalTarget, setGarmentType]);
+
+  const handleRefinePrompt = async () => {
+    const idea = prompt.trim();
+    if (!idea) {
+      setRefinement(null);
+      setRefineError("Type your idea first, then tap refine.");
+      return;
+    }
+    setRefining(true);
+    setRefineError(null);
+    try {
+      const res = await fetch("/api/refine-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: idea,
+          style: selectedTag,
+          garment: garmentType,
+          printSide: decalTarget,
+          fabric: describeFabric(color), // so suggestions use inks that read on this fabric colour
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Couldn't refine the prompt.");
+      setRefinement({ refined: data.refined, suggestions: data.suggestions ?? [], tips: data.tips ?? [] });
+    } catch (err) {
+      setRefinement(null);
+      setRefineError(err instanceof Error ? err.message : "Couldn't refine the prompt.");
+    } finally {
+      setRefining(false);
+    }
+  };
+
+  const applyRefinedText = (text: string) => {
+    setPromptBeforeRefine((prev) => prev ?? prompt); // remember the user's own wording once, for Undo
+    setPrompt(text);
+    setAppliedRefinement(text);
+    setRefinement(null);
+    promptRef.current?.focus();
+  };
 
   // Synthesis generator using Stability AI
   const handleGenerate = async (e: React.FormEvent) => {
@@ -206,14 +530,16 @@ export default function DesignLabPage() {
     setIsGenerating(true);
 
     try {
-      const fullPrompt = `${prompt}, styled as a modern graphic design print decal, ${selectedTag.toLowerCase()} style, centered, high quality, vector graphic, isolated white background`;
-      
+      const fullPrompt = referenceImage
+        ? `Using the attached image as a visual reference, ${prompt}, styled as a modern graphic design print decal, ${selectedTag.toLowerCase()} style, centered, high quality, vector graphic, isolated white background`
+        : `${prompt}, styled as a modern graphic design print decal, ${selectedTag.toLowerCase()} style, centered, high quality, vector graphic, isolated white background`;
+
       const response = await fetch("/api/stability", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt: fullPrompt }),
+        body: JSON.stringify({ prompt: fullPrompt, referenceImage }),
       });
 
       const data = await response.json();
@@ -234,12 +560,27 @@ export default function DesignLabPage() {
   };
 
   // Add custom design to shopping cart
-  const handleAddToCart = async () => {
+  const garmentPrice = garmentType === "hoodie" ? 1999 : garmentType === "oversized" ? 1299 : 999;
+
+  // Add to Cart / Update first asks for a size (pre-selected with the current one)
+  const [sizePromptMode, setSizePromptMode] = useState<"auto" | "new" | null>(null);
+  const requestAddToCart = (mode: "auto" | "new") => {
     if (!user) {
       router.push(`/auth?redirect=/customize`);
       return;
     }
+    setSizePromptMode(mode);
+  };
 
+  // Adds the design to the cart (saving an editable copy), or updates the cart item being edited
+  const handleAddToCart = async (mode: "auto" | "new", chosenSize: SizeOption) => {
+    if (!user) {
+      router.push(`/auth?redirect=/customize`);
+      return;
+    }
+    setSize(chosenSize); // keep the lab + saved snapshot in sync with the chosen size
+
+    const updating = mode === "auto" && !!editingItem;
     setCartSuccess(true);
     const activeDecalUrl = customTextureUrl || (design === "logo" ? "/logos/trimmed_yeulumin ai-05.png" : null);
     const snapshots = await getGarmentFrontAndBackSnapshots(
@@ -254,19 +595,36 @@ export default function DesignLabPage() {
       design
     );
 
-    addItem({
-      id: `custom-lab-${Date.now()}`,
+    const details = {
       name: `Custom ${selectedTag} ${garmentType === "hoodie" ? "Hoodie" : garmentType === "oversized" ? "Oversized Tee" : "Tee"}`,
       description: prompt || `Bespoke customized streetwear ${garmentType === "hoodie" ? "hoodie" : garmentType === "oversized" ? "oversized tee" : "garment"}.`,
-      price: garmentType === "hoodie" ? 1999 : garmentType === "oversized" ? 1299 : 999,
-      quantity: 1,
-      size: size,
+      price: garmentPrice,
+      size: chosenSize,
       color: color,
       image: snapshots.front,
       backImage: snapshots.back,
       prompt: customPrompt || prompt || "",
       style: selectedTag,
-    });
+    };
+    const designSnapshot = captureDesignSnapshot(selectedTag);
+
+    if (updating && editingItem) {
+      const designId = editingItem.designId ?? editingItem.id;
+      await saveDesignSnapshot(designId, designSnapshot);
+      updateCartItem(editingItem.id, { ...details, designId });
+      setEditingCartId(null);
+      setTimeout(() => {
+        setCartSuccess(false);
+        router.push("/cart");
+      }, 900);
+      return;
+    }
+
+    const id = `custom-lab-${Date.now()}`;
+    // Save the editable copy first so the cart never points at a missing design
+    await saveDesignSnapshot(id, designSnapshot);
+    addItem({ id, ...details, quantity: 1, designId: id });
+    if (mode === "new") setEditingCartId(null);
 
     setTimeout(() => setCartSuccess(false), 2500);
   };
@@ -321,21 +679,122 @@ export default function DesignLabPage() {
     }
   };
 
-  // Preset Card handler
-  const handleApplyPreset = (product: Product) => {
-    if (product.defaultColor) setColor(product.defaultColor);
-    if (product.image) {
-      setCustomTextureUrl(product.image);
-      setCustomPrompt(product.description);
-      setDesign("ai");
-    }
-    if (product.defaultView) setView(product.defaultView);
-    if (product.printPosition) setDecalTarget(product.printPosition);
-  };
 
-  const isPresetActive = (product: Product) => {
-    return customTextureUrl === product.image;
-  };
+  // The wand glows when there is fresh text to refine (not while refining, not while
+  // suggestions are open, and not for a prompt that is already the AI-refined version)
+  const refineReady =
+    prompt.trim().length > 0 && !refining && !refinement && !isGenerating && prompt !== appliedRefinement;
+
+  // Print placement controls (rendered over the stage on larger screens, below it on phones)
+  const nudgeX = (d: number) => setDecalPosX(clamp(useViewerStore.getState().decalPosX + d, POS_X_RANGE));
+  const nudgeY = (d: number) => setDecalPosY(clamp(useViewerStore.getState().decalPosY + d, POS_Y_RANGE));
+  const nudgeScale = (d: number) => setDecalScale(clamp(useViewerStore.getState().decalScale + d, SCALE_RANGE));
+  const moveBtn = "h-11 flex-1 sm:h-9 sm:w-9 sm:flex-none";
+
+  const placementPanel = (
+    <div className="bg-white/95 backdrop-blur-md border border-neutral-200 rounded-2xl shadow-xl p-3">
+      <div className="flex items-center justify-between gap-2 mb-3 sm:mb-2.5">
+        <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest font-bold whitespace-nowrap">
+          Adjust print
+        </span>
+        <div className="flex items-center gap-1">
+          {customTextureUrl && (
+            <button
+              type="button"
+              onClick={openCropForCurrent}
+              className="h-8 sm:h-7 px-2 rounded-lg text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 hover:bg-blue-100 flex items-center gap-1 cursor-pointer"
+              title="Crop the image and round its corners"
+            >
+              <Crop className="h-3.5 w-3.5" />
+              <span className="sm:hidden">Crop</span>
+              <span className="hidden sm:inline">Crop &amp; corners</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const target = decalTarget;
+              resetDecalPlacement();
+              setDecalTarget(target);
+            }}
+            className="h-8 sm:h-7 px-2 rounded-lg text-[10px] font-bold uppercase tracking-wider text-neutral-500 hover:text-blue-600 hover:bg-blue-50 flex items-center gap-1 cursor-pointer"
+            title="Reset position & size"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowPlacement(false)}
+            className="h-8 w-8 sm:h-7 sm:w-7 rounded-lg text-neutral-500 hover:bg-neutral-100 flex items-center justify-center cursor-pointer"
+            title="Done"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Phones: 2-column grid with a full-width move row; larger screens: one row */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-3 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-4">
+        {/* Side */}
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex w-full sm:w-auto bg-neutral-100 p-1 rounded-xl">
+            {(["front", "back"] as const).map((target) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => {
+                  setDecalTarget(target);
+                  setView(target);
+                }}
+                className={`flex-1 sm:flex-none px-3 py-2 sm:py-1.5 text-[10px] font-bold uppercase rounded-lg cursor-pointer transition-all ${
+                  decalTarget === target ? "bg-white text-blue-600 shadow-sm" : "text-neutral-500 hover:text-neutral-800"
+                }`}
+              >
+                {target}
+              </button>
+            ))}
+          </div>
+          <span className="text-[8px] font-mono uppercase tracking-wider text-neutral-400">Side</span>
+        </div>
+
+        {/* Size */}
+        <div className="flex flex-col items-center gap-1 sm:order-last">
+          <div className="flex items-center gap-1">
+            <HoldButton title="Smaller" className="h-10 w-10 sm:h-9 sm:w-9" onStep={() => nudgeScale(-0.01)}>
+              <Minus className="h-4 w-4" />
+            </HoldButton>
+            <span className="w-11 text-center text-xs font-bold text-neutral-700 tabular-nums">
+              {Math.round(decalScale * 100)}%
+            </span>
+            <HoldButton title="Bigger" className="h-10 w-10 sm:h-9 sm:w-9" onStep={() => nudgeScale(0.01)}>
+              <Plus className="h-4 w-4" />
+            </HoldButton>
+          </div>
+          <span className="text-[8px] font-mono uppercase tracking-wider text-neutral-400">Size</span>
+        </div>
+
+        {/* Move */}
+        <div className="col-span-2 flex flex-col items-center gap-1">
+          <div className="flex w-full sm:w-auto items-center gap-1.5 sm:gap-1">
+            <HoldButton title="Move left" className={moveBtn} onStep={() => nudgeX(-0.005)}>
+              <ArrowLeft className="h-4 w-4" />
+            </HoldButton>
+            <HoldButton title="Move up" className={moveBtn} onStep={() => nudgeY(0.005)}>
+              <ArrowUp className="h-4 w-4" />
+            </HoldButton>
+            <HoldButton title="Move down" className={moveBtn} onStep={() => nudgeY(-0.005)}>
+              <ArrowDown className="h-4 w-4" />
+            </HoldButton>
+            <HoldButton title="Move right" className={moveBtn} onStep={() => nudgeX(0.005)}>
+              <ArrowRight className="h-4 w-4" />
+            </HoldButton>
+          </div>
+          <span className="text-[8px] font-mono uppercase tracking-wider text-neutral-400">Move (press &amp; hold)</span>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="relative min-h-screen flex flex-col bg-[#F5F6F8] text-[#0A0A0A] overflow-x-hidden antialiased">
@@ -376,10 +835,15 @@ export default function DesignLabPage() {
       </header>
 
       {/* ─── MAIN WORKSPACE CONTENT ─── */}
-      <main className="flex-grow flex flex-col items-center justify-center relative select-none w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 gap-6">
+      <main className="flex-grow flex flex-col items-center justify-start relative select-none w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 pb-4 gap-3">
         
         {/* 3D MANNEQUIN SHOWROOM STAGE */}
-        <div className="w-full max-w-2xl h-[440px] md:h-[500px] relative flex items-center justify-center">
+        <div
+          className={`w-full max-w-3xl min-h-[300px] max-h-[760px] relative flex items-center justify-center ${
+            // On phones the placement panel (taller than the prompt box) sits below the stage
+            showPlacement ? "h-[calc(100svh-21.5rem)] sm:h-[calc(100svh-17.5rem)]" : "h-[calc(100svh-17.5rem)]"
+          }`}
+        >
           
           {/* Orbital blue glow ring behind t-shirt mesh */}
           <div className="absolute inset-0 m-auto w-[18rem] h-[18rem] sm:w-[22rem] sm:h-[22rem] md:w-[28rem] md:h-[28rem] rounded-full border border-blue-500/10 bg-transparent flex items-center justify-center pointer-events-none select-none z-0">
@@ -389,14 +853,14 @@ export default function DesignLabPage() {
           {/* Three.js interactive model canvas */}
           <div className="absolute inset-0 z-10">
             <TshirtViewer
-              scale={1.5}
+              scale={3.2}
               autoRotateSpeed={autoRotate ? 2.0 : 0}
               cameraDistance={zoomLevel === "close" ? 2.4 : 3.6}
             />
           </div>
 
-          {/* LEFT VERTICAL FLOATING CAMERA CONTROL MODULE */}
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col">
+          {/* TOP-LEFT FLOATING CAMERA CONTROL MODULE */}
+          <div className="absolute left-0 top-0 z-20 flex flex-col">
             
             {/* View toggle button */}
             <button
@@ -448,7 +912,7 @@ export default function DesignLabPage() {
                     setCustomTextureUrl(null);
                     setDesign("none");
                     resetDecalPlacement();
-                    setAutoRotate(true);
+                    setAutoRotate(false);
                     setZoomLevel("wide");
                   }}
                   className="flex flex-col items-center justify-center gap-1 p-1.5 rounded-lg hover:bg-neutral-50 transition-colors text-neutral-500 cursor-pointer"
@@ -462,23 +926,68 @@ export default function DesignLabPage() {
 
           </div>
 
+
+          {/* EDITING-CART-ITEM BANNER */}
+          {editingItem && (
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl pl-3 pr-1 py-1 shadow-sm max-w-[45%]">
+              <ShoppingBag className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="text-[9px] font-bold uppercase tracking-widest truncate">
+                Editing<span className="hidden sm:inline"> cart item</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setEditingCartId(null)}
+                className="h-6 w-6 rounded-lg hover:bg-amber-100 flex items-center justify-center cursor-pointer flex-shrink-0"
+                title="Stop editing (cart item stays unchanged)"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* TOP-RIGHT DELETE DESIGN BUTTON */}
+          {hasDesign && (
+            <button
+              type="button"
+              onClick={() => (confirmDelete ? handleDeleteDesign() : setConfirmDelete(true))}
+              className={`absolute right-0 top-0 z-20 rounded-xl px-3 py-2 text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5 shadow-md cursor-pointer transition-colors ${
+                confirmDelete
+                  ? "bg-red-600 text-white hover:bg-red-700 shadow-red-600/20"
+                  : "bg-white border border-neutral-200 text-neutral-600 hover:text-red-600 hover:border-red-200"
+              }`}
+              title="Delete this design and start over"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span className={confirmDelete ? "" : "hidden sm:inline"}>{confirmDelete ? "Tap to confirm" : "Delete design"}</span>
+            </button>
+          )}
+
+          {/* ON-STAGE PLACEMENT PANEL — desktop/tablet: floats over the stage */}
+          {showPlacement && (
+            <div className="hidden sm:block absolute bottom-2 left-1/2 -translate-x-1/2 z-30 w-[calc(100%-1rem)] max-w-md animate-fadeIn">
+              {placementPanel}
+            </div>
+          )}
+
         </div>
 
+        {/* PLACEMENT PANEL — phones: takes the prompt console's spot below the model */}
+        {showPlacement && <div className="sm:hidden w-full z-20 animate-fadeIn">{placementPanel}</div>}
+
         {/* ─── AI GENERATOR INPUT CONSOLE (FLOATING CARD) ─── */}
-        <section className="w-full max-w-xl bg-white border border-neutral-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-lg z-20 flex flex-col gap-2.5 sm:gap-3 relative mx-auto">
+        <section className={`w-full max-w-xl bg-white border border-neutral-200/80 rounded-2xl sm:rounded-3xl p-3 sm:p-5 shadow-lg z-20 flex-col gap-2.5 sm:gap-3 relative mx-auto ${showPlacement ? "hidden sm:flex" : "flex"}`}>
           
           {/* Prompt input with rotating placeholder carousel */}
           <div className="relative">
             <div className="flex items-start gap-2">
               <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-[#3BA6FC] flex-shrink-0 mt-0.5" />
               <textarea
+                ref={promptRef}
                 rows={1}
                 value={prompt}
                 onChange={(e) => {
                   setPrompt(e.target.value);
-                  // Auto-resize textarea
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
+                  if (refineError) setRefineError(null);
                 }}
                 onFocus={() => { if (PROMPT_SUGGESTIONS.includes(prompt)) setPrompt(""); }}
                 disabled={isGenerating}
@@ -508,6 +1017,116 @@ export default function DesignLabPage() {
             </div>
           </div>
 
+          {/* Undo after applying a refinement */}
+          {promptBeforeRefine !== null && !refinement && (
+            <div className="flex items-center justify-between gap-2 -mt-1 text-[10px]">
+              <span className="text-neutral-400 font-mono uppercase tracking-wider">AI-refined prompt</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPrompt(promptBeforeRefine);
+                  setPromptBeforeRefine(null);
+                }}
+                className="font-bold text-blue-600 hover:text-blue-700 cursor-pointer"
+              >
+                Undo — back to my text
+              </button>
+            </div>
+          )}
+
+          {/* Refinement error */}
+          {refineError && (
+            <div className="text-[11px] text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{refineError}</div>
+          )}
+
+          {/* Gemini refinement + suggestions */}
+          {refinement && (
+            <div
+              ref={refinePanelRef}
+              className="border border-blue-100 bg-blue-50/40 rounded-2xl p-2.5 sm:p-3 flex flex-col gap-2 max-h-[45svh] sm:max-h-80 overflow-y-auto scroll-mb-4 animate-fadeIn"
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest font-bold text-blue-600">
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Refined prompt
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRefinement(null)}
+                  className="h-6 w-6 rounded-lg hover:bg-blue-100 text-neutral-500 flex items-center justify-center cursor-pointer"
+                  title="Dismiss"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => applyRefinedText(refinement.refined)}
+                className="text-left bg-white border border-blue-200 hover:border-blue-500 rounded-xl p-2.5 text-xs text-neutral-800 leading-relaxed cursor-pointer transition-colors group"
+              >
+                {refinement.refined}
+                <span className="block mt-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600 group-hover:underline">
+                  Use this prompt
+                </span>
+              </button>
+
+              {refinement.suggestions.length > 0 && (
+                <>
+                  <span className="text-[10px] font-mono uppercase tracking-widest font-bold text-neutral-400 mt-1">
+                    Other directions
+                  </span>
+                  {refinement.suggestions.map((sugg, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => applyRefinedText(sugg)}
+                      className="text-left bg-white border border-neutral-200 hover:border-blue-400 rounded-xl px-2.5 py-2 text-[11px] text-neutral-700 leading-relaxed cursor-pointer transition-colors"
+                    >
+                      {sugg}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {refinement.tips.length > 0 && (
+                <ul className="text-[10px] text-neutral-500 list-disc pl-4 space-y-0.5">
+                  {refinement.tips.map((tip, i) => (
+                    <li key={i}>{tip}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Attached reference image chip */}
+          {referenceImage && (
+            <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 rounded-xl p-1.5 pr-2 self-start max-w-full">
+              <img
+                src={referenceImage}
+                alt="Reference"
+                className="h-9 w-9 rounded-lg object-cover border border-neutral-200"
+              />
+              <div className="flex flex-col min-w-0">
+                <span className="text-[9px] font-mono text-neutral-400 uppercase tracking-widest font-bold">
+                  Reference
+                </span>
+                <span className="text-[11px] text-neutral-700 truncate max-w-[180px]">{referenceName}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setReferenceImage(null);
+                  setReferenceName("");
+                }}
+                className="ml-1 h-5 w-5 rounded-full bg-neutral-200 hover:bg-neutral-300 text-neutral-600 flex items-center justify-center cursor-pointer"
+                title="Remove reference image"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
           {/* Lower controls bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-2.5 sm:pt-3">
             
@@ -520,19 +1139,82 @@ export default function DesignLabPage() {
               >
                 <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
+              {/* Reference image for the prompt */}
+              <input
+                ref={refFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleReferenceUpload}
+              />
               <button
                 type="button"
-                className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
-                title="Upload Reference Image"
+                onClick={() => refFileInputRef.current?.click()}
+                disabled={isGenerating}
+                className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition-colors cursor-pointer disabled:opacity-40 ${
+                  referenceImage ? "bg-blue-50 text-blue-600" : "bg-neutral-100 hover:bg-neutral-200"
+                }`}
+                title="Attach Reference Image for Prompt"
               >
                 <ImageIcon className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
+
+              {/* Upload image directly onto the model (front / back) */}
+              <input
+                ref={modelFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleModelImageUpload}
+              />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
+                  disabled={isUploading || isGenerating}
+                  className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition-colors cursor-pointer disabled:opacity-40 ${
+                    uploadMenuOpen ? "bg-blue-50 text-blue-600" : "bg-neutral-100 hover:bg-neutral-200"
+                  }`}
+                  title="Upload Image to Model"
+                >
+                  <Upload className={`h-4 w-4 sm:h-5 sm:w-5 ${isUploading ? "animate-pulse text-blue-600" : ""}`} />
+                </button>
+                {uploadMenuOpen && (
+                  <div className="absolute bottom-full left-0 mb-2 z-30 bg-white border border-neutral-200 rounded-xl shadow-lg p-2 flex flex-col gap-1 min-w-[150px] animate-fadeIn">
+                    <span className="px-2 pt-1 pb-1.5 text-[9px] font-mono text-neutral-400 uppercase tracking-widest font-bold">
+                      Place image on
+                    </span>
+                    {(["front", "back"] as const).map((target) => (
+                      <button
+                        key={target}
+                        type="button"
+                        onClick={() => startModelUpload(target)}
+                        className="text-left px-2.5 py-2 rounded-lg text-xs font-semibold text-neutral-700 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer capitalize"
+                      >
+                        {target}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
-                className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-neutral-100 hover:bg-neutral-200 transition-colors cursor-pointer"
-                title="Refine Prompt"
+                onClick={handleRefinePrompt}
+                disabled={refining || isGenerating}
+                className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl transition-colors cursor-pointer disabled:opacity-60 ${
+                  refineReady
+                    ? "refine-glow bg-gradient-to-br from-blue-500 to-violet-500 text-white"
+                    : refinement
+                      ? "bg-blue-50 text-blue-600"
+                      : "bg-neutral-100 hover:bg-neutral-200"
+                }`}
+                title={refineReady ? "Refine this prompt with AI" : "Refine prompt with AI"}
               >
-                <Wand2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                {refining ? (
+                  <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-blue-600" />
+                ) : (
+                  <Wand2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                )}
               </button>
             </div>
 
@@ -664,69 +1346,6 @@ export default function DesignLabPage() {
               </div>
             )}
 
-            {/* PLACEMENT SLIDERS DRAWER */}
-            {activeTool === "placement" && (
-              <div className="flex flex-col gap-4 text-left">
-                <span className="text-[10px] font-mono text-neutral-400 uppercase tracking-widest font-bold">
-                  Shift design positioning
-                </span>
-                
-                {/* Horizontal slide */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-[9px] font-mono text-neutral-500 uppercase tracking-wider">
-                    <span>Horizontal offset</span>
-                    <span>{(decalPosX * 100).toFixed(0)}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="-0.1"
-                    max="0.1"
-                    step="0.01"
-                    value={decalPosX}
-                    onChange={(e) => setDecalPosX(parseFloat(e.target.value))}
-                    className="w-full accent-blue-600 h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-
-                {/* Vertical slide */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between text-[9px] font-mono text-neutral-500 uppercase tracking-wider">
-                    <span>Vertical offset</span>
-                    <span>{(decalPosY * 100).toFixed(0)}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="-0.1"
-                    max="0.2"
-                    step="0.01"
-                    value={decalPosY}
-                    onChange={(e) => setDecalPosY(parseFloat(e.target.value))}
-                    className="w-full accent-blue-600 h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-
-              </div>
-            )}
-
-            {/* SCALE SIZE DRAWER */}
-            {activeTool === "size" && (
-              <div className="flex flex-col gap-3 text-left">
-                <div className="flex justify-between text-[10px] font-mono text-neutral-400 uppercase tracking-widest font-bold">
-                  <span>Decal print scale</span>
-                  <span className="text-neutral-700">{(decalScale * 100).toFixed(0)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="0.6"
-                  step="0.01"
-                  value={decalScale}
-                  onChange={(e) => setDecalScale(parseFloat(e.target.value))}
-                  className="w-full accent-blue-600 h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-            )}
-
           </div>
         )}
 
@@ -754,9 +1373,12 @@ export default function DesignLabPage() {
           </button>
 
           <button
-            onClick={() => setActiveTool(activeTool === "placement" ? null : "placement")}
+            onClick={() => {
+              setShowPlacement(!showPlacement);
+              setActiveTool(null);
+            }}
             className={`flex flex-col items-center gap-1 text-neutral-400 hover:text-neutral-800 transition-colors cursor-pointer ${
-              activeTool === "placement" ? "text-blue-600 font-semibold" : ""
+              showPlacement ? "text-blue-600 font-semibold" : ""
             }`}
           >
             <Move className="h-5 w-5" />
@@ -764,9 +1386,12 @@ export default function DesignLabPage() {
           </button>
 
           <button
-            onClick={() => setActiveTool(activeTool === "size" ? null : "size")}
+            onClick={() => {
+              setShowPlacement(!showPlacement);
+              setActiveTool(null);
+            }}
             className={`flex flex-col items-center gap-1 text-neutral-400 hover:text-neutral-800 transition-colors cursor-pointer ${
-              activeTool === "size" ? "text-blue-600 font-semibold" : ""
+              showPlacement ? "text-blue-600 font-semibold" : ""
             }`}
           >
             <Maximize2 className="h-5 w-5" />
@@ -789,20 +1414,37 @@ export default function DesignLabPage() {
         {/* Add to Cart CTA Button */}
         <div className="w-full max-w-xl z-20">
           <button
-            onClick={handleAddToCart}
+            onClick={() => requestAddToCart("auto")}
             className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-lg shadow-blue-500/20 hover:scale-101 active:scale-99 transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <ShoppingBag className="h-4.5 w-4.5" />
-            <span>{cartSuccess ? "Added to Cart!" : "Add to Cart (₹999)"}</span>
+            <span>
+              {editingItem
+                ? cartSuccess
+                  ? "Cart Updated!"
+                  : `Update Cart Item (₹${garmentPrice})`
+                : cartSuccess
+                  ? "Added to Cart!"
+                  : `Add to Cart (₹${garmentPrice})`}
+            </span>
           </button>
+          {editingItem && (
+            <button
+              type="button"
+              onClick={() => requestAddToCart("new")}
+              className="w-full mt-2 py-2 text-[11px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-700 cursor-pointer"
+            >
+              Or add as a new item
+            </button>
+          )}
         </div>
 
-        {/* ─── STYLES FOR YOU (TEMPLATE SELECTOR CAROUSEL) ─── */}
+        {/* ─── AI STYLE PICKER (steers the prompt; catalog designs are buy-only and not shown here) ─── */}
         <section className="w-full my-8 text-left">
           
           <div className="flex items-center gap-2 mb-6">
             <h2 className="font-display text-lg font-black uppercase tracking-wider text-neutral-900">
-              Styles for you
+              AI design style
             </h2>
             <div className="h-[2px] w-8 bg-neutral-900" />
           </div>
@@ -839,60 +1481,34 @@ export default function DesignLabPage() {
             })}
           </div>
 
-          {/* Horizontal Preset Carousel Cards */}
-          <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-none w-full snap-x snap-mandatory">
-            {filteredPresets.map((prod, idx) => {
-              const active = isPresetActive(prod);
-              return (
-                <div
-                  key={prod.id}
-                  onClick={() => handleApplyPreset(prod)}
-                  className={`flex-shrink-0 w-[180px] snap-start bg-white border rounded-2xl overflow-hidden group flex flex-col justify-between transition-all duration-300 shadow-sm cursor-pointer hover:shadow-md ${
-                    active ? "border-blue-500 ring-1 ring-blue-500/30" : "border-neutral-200/80"
-                  }`}
-                >
-                  {/* Preset Image */}
-                  <div className="relative aspect-square w-full bg-[#F9FAFB] flex items-center justify-center p-3">
-                    
-                    {/* Active checkmark indicator */}
-                    {active && (
-                      <div className="absolute top-2.5 right-2.5 z-10 h-5 w-5 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md animate-scaleIn">
-                        <Check className="h-3 w-3 font-bold" />
-                      </div>
-                    )}
-
-                    <img
-                      src={prod.image}
-                      alt={prod.name}
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  </div>
-
-                  {/* Preset Label info */}
-                  <div className="p-3 text-left border-t border-neutral-50">
-                    <h3 className="font-bold text-neutral-800 text-xs truncate">
-                      {prod.name}
-                    </h3>
-                    <span className="text-[9px] text-neutral-400 font-mono block mt-0.5">
-                      Version {idx + 1}
-                    </span>
-                  </div>
-
-                  {/* Active bottom ribbon */}
-                  {active && (
-                    <div className="w-full py-1 bg-blue-600 text-white text-[8px] font-mono font-bold text-center uppercase tracking-widest shadow-inner">
-                      Applied to design
-                    </div>
-                  )}
-
-                </div>
-              );
-            })}
-          </div>
-
         </section>
 
       </main>
+
+      {/* SIZE PICKER (before adding / updating the cart) */}
+      {sizePromptMode && (
+        <SizePickerModal
+          title={`Custom ${garmentType === "hoodie" ? "Hoodie" : garmentType === "oversized" ? "Oversized Tee" : "Tee"}`}
+          price={garmentPrice}
+          initialSize={size}
+          confirmLabel={sizePromptMode === "auto" && editingItem ? "Update Cart Item" : "Add to Cart"}
+          onConfirm={(chosen) => {
+            const mode = sizePromptMode;
+            setSizePromptMode(null);
+            void handleAddToCart(mode, chosen);
+          }}
+          onClose={() => setSizePromptMode(null)}
+        />
+      )}
+
+      {/* IMAGE CROP / ROUNDED CORNERS EDITOR */}
+      {cropSession && (
+        <ImageCropModal
+          source={cropSession.source}
+          onCancel={() => setCropSession(null)}
+          onApply={applyCroppedImage}
+        />
+      )}
 
       {/* GARMENT SELECTION INITIAL MODAL POP-UP */}
       {showGarmentModal && (

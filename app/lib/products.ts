@@ -187,21 +187,94 @@ export const PRODUCTS: Product[] = [
 
 export const CATEGORIES = ["All", "Minimal", "Streetwear", "Vintage", "Anime"];
 
-export async function fetchDriveProducts(forceRefresh = false): Promise<{ categories: string[]; products: Product[] }> {
-  try {
-    const url = forceRefresh ? "/api/gdrive?refresh=true" : "/api/gdrive";
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("GDrive endpoint unreachable");
-    const data = await res.json();
-    if (data.products && data.products.length > 0) {
-      return {
-        categories: data.categories || CATEGORIES,
-        products: data.products,
-      };
-    }
-  } catch (err) {
-    console.warn("Failed to fetch live GDrive collection, using fallback:", err);
-  }
-  return { categories: CATEGORIES, products: PRODUCTS };
+type DriveCollection = { categories: string[]; products: Product[] };
+
+/** True for catalog designs served from Google Drive. These are buy-only and never loaded into the Design Lab. */
+export function isCatalogDesignUrl(url: string): boolean {
+  return /\/api\/gdrive\/image|googleusercontent\.com|drive\.google\.com/i.test(url);
 }
 
+/**
+ * Smaller version of a product image for cards/thumbnails. Drive originals can be several MB;
+ * the proxy can return a resized copy. Non-Drive URLs are returned unchanged.
+ */
+export function thumbnailUrl(url: string, width: 256 | 512 | 1024 = 512): string {
+  return url.startsWith("/api/gdrive/image?") ? `${url}&w=${width}` : url;
+}
+
+// Client-side cache for the Drive collection: memory for in-app navigation, localStorage so a
+// reload renders instantly instead of re-scraping Google Drive every time.
+const DRIVE_CACHE_KEY = "yeulumin-drive-collection-v1";
+const DRIVE_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+let memoryCache: { at: number; data: DriveCollection } | null = null;
+let inflight: Promise<DriveCollection | null> | null = null;
+
+function readStoredCollection(): { at: number; data: DriveCollection } | null {
+  if (memoryCache) return memoryCache;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRIVE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.data?.products?.length) {
+      memoryCache = parsed;
+      return parsed;
+    }
+  } catch {
+    /* corrupted or unavailable storage */
+  }
+  return null;
+}
+
+function storeCollection(data: DriveCollection) {
+  memoryCache = { at: Date.now(), data };
+  try {
+    localStorage.setItem(DRIVE_CACHE_KEY, JSON.stringify(memoryCache));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+async function fetchCollectionFromApi(forceRefresh: boolean): Promise<DriveCollection | null> {
+  // De-duplicate concurrent requests (several components ask on the same page load)
+  if (inflight && !forceRefresh) return inflight;
+  const req = (async () => {
+    try {
+      const res = await fetch(forceRefresh ? "/api/gdrive?refresh=true" : "/api/gdrive");
+      if (!res.ok) throw new Error("GDrive endpoint unreachable");
+      const data = await res.json();
+      if (data.products && data.products.length > 0) {
+        const collection = { categories: data.categories || CATEGORIES, products: data.products };
+        storeCollection(collection);
+        return collection;
+      }
+    } catch (err) {
+      console.warn("Failed to fetch live GDrive collection:", err);
+    }
+    return null;
+  })();
+  if (!forceRefresh) {
+    inflight = req;
+    req.finally(() => {
+      inflight = null;
+    });
+  }
+  return req;
+}
+
+/**
+ * Returns the Drive collection. Uses the cached copy when it is fresh; when it is stale the
+ * cached copy is still returned immediately and refreshed in the background.
+ * `forceRefresh` bypasses every cache (use sparingly — it re-scrapes Google Drive).
+ */
+export async function fetchDriveProducts(forceRefresh = false): Promise<DriveCollection> {
+  if (!forceRefresh) {
+    const cached = readStoredCollection();
+    if (cached) {
+      if (Date.now() - cached.at > DRIVE_CACHE_TTL_MS) void fetchCollectionFromApi(false);
+      return cached.data;
+    }
+  }
+  const fresh = await fetchCollectionFromApi(forceRefresh);
+  return fresh ?? readStoredCollection()?.data ?? { categories: CATEGORIES, products: PRODUCTS };
+}

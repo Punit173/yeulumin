@@ -10,7 +10,20 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { prompt, apiKey: clientApiKey } = body;
+    const { prompt, apiKey: clientApiKey, referenceImage } = body;
+
+    // Optional reference image (data URL) to guide generation
+    let referencePart: { inlineData: { mimeType: string; data: string } } | null = null;
+    if (typeof referenceImage === "string" && referenceImage) {
+      const match = referenceImage.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!match) {
+        return NextResponse.json(
+          { success: false, error: "Reference image must be a base64 image data URL." },
+          { status: 400 }
+        );
+      }
+      referencePart = { inlineData: { mimeType: match[1], data: match[2] } };
+    }
 
     const apiKey = clientApiKey || process.env.GEMINI_API_KEY;
 
@@ -35,7 +48,8 @@ export async function POST(req: NextRequest) {
     const errors: string[] = [];
 
     // 1. First attempt: Use the dedicated Imagen 3 model via :predict method
-    try {
+    //    (text-only, so skipped when a reference image is attached)
+    if (!referencePart) try {
       const imagenUrl = `${GEMINI_BASE}/models/imagen-3.0-generate-002:predict?key=${apiKey.trim()}`;
       const imagenBody = {
         instances: [
@@ -97,6 +111,7 @@ export async function POST(req: NextRequest) {
       contents: [
         {
           parts: [
+            ...(referencePart ? [referencePart] : []),
             {
               text: prompt,
             },

@@ -4,13 +4,13 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, Decal, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
+import { DecalGeometry } from "three/examples/jsm/geometries/DecalGeometry.js";
 import { useViewerStore } from "./useViewerStore";
+import { registerGarmentCapturer } from "./snapshotRegistry";
 
-// Preload the GLB models
+// Preload only the light default model. The oversized (~18MB) and hoodie (~43MB) GLBs are
+// fetched on demand — preloading everything at once made the selected garment crawl in.
 useGLTF.preload("/models/tshirt.glb");
-useGLTF.preload("/models/premium_eco_hoodie.glb");
-useGLTF.preload("/models/1.glb");
-useGLTF.preload("/models/oversized_t-shirt.glb");
 
 // Helper function to generate design textures on a 512x512 canvas
 function generateDesignTexture(designId: string): THREE.CanvasTexture | null {
@@ -118,6 +118,7 @@ function generateDesignTexture(designId: string): THREE.CanvasTexture | null {
   }
 
   const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
   texture.needsUpdate = true;
   return texture;
 }
@@ -150,16 +151,17 @@ export default function TshirtModel({
   const useSceneRenderer = isHoodie || isOversized; // multi-mesh models use <primitive object={scene}>
 
   // Access three.js canvas size
-  const { size: canvasSize } = useThree();
+  const { size: canvasSize, gl, scene: rootScene, camera } = useThree();
+  const garmentGroupRef = useRef<THREE.Group>(null);
 
-  // Dynamically adjust scale on narrow screen aspect ratios to maximize size without clipping
+  // Scale up on narrow screens, but clamp so the garment never clips the canvas edges
   const responsiveScale = useMemo(() => {
-    const aspect = canvasSize.width / canvasSize.height;
-    if (aspect < 1) {
-      const scaleMultiplier = Math.min(2.25, 1.2 / aspect);
-      return scale * scaleMultiplier;
-    }
-    return scale;
+    const aspect = canvasSize.width / Math.max(1, canvasSize.height);
+    const visibleH = 2 * 3.7 * Math.tan((45 / 2) * (Math.PI / 180)); // camera fov 45, ~3.7 from target
+    const fitW = (visibleH * aspect * 0.9) / 0.66; // widest garment ≈ 0.66 units
+    const fitH = (visibleH * 0.85) / 0.72; // tallest garment ≈ 0.72 units
+    const mult = aspect < 1 ? Math.min(2.25, 1.2 / aspect) : 1;
+    return Math.min(scale * mult, fitW, fitH);
   }, [scale, canvasSize.width, canvasSize.height]);
 
   const glbPath = isHoodie
@@ -178,6 +180,7 @@ export default function TshirtModel({
   useEffect(() => {
     if (useSceneRenderer && scene) {
       scene.traverse((child: any) => {
+        if (child.userData?.isDecal) return; // never recolor our own print decals
         const name = (child.name || "").toLowerCase();
         const parentName = (child.parent?.name || "").toLowerCase();
 
@@ -239,38 +242,18 @@ export default function TshirtModel({
     }
   }, [color, shirtMeshNode, materials, useSceneRenderer, isHoodie, scene]);
 
-  const hoodieMeshRef = useRef<THREE.Mesh | null>(null);
-
-  useEffect(() => {
-    if (isHoodie) {
-      if (nodes.hoodie_Sweat_Rib_1X1_319gsm_hoodie_0) {
-        hoodieMeshRef.current = nodes.hoodie_Sweat_Rib_1X1_319gsm_hoodie_0;
-      } else if (nodes.Object_4) {
-        hoodieMeshRef.current = nodes.Object_4;
-      } else {
-        let foundMesh: THREE.Mesh | null = null;
-        if (scene) {
-          scene.traverse((child: any) => {
-            if (!foundMesh && child.isMesh && child.visible) {
-              foundMesh = child;
-            }
-          });
-        }
-        hoodieMeshRef.current = foundMesh;
-      }
-    } else {
-      hoodieMeshRef.current = null;
-    }
-  }, [isHoodie, nodes, scene]);
-
   useEffect(() => {
     if (useSceneRenderer && scene) {
+      // Center the model inside its parent group. The bounding box is measured in world space,
+      // so convert its center into the parent's local space — otherwise the parent's scale/offset
+      // gets applied twice and the garment can be pushed out of view (depending on render timing).
       scene.position.set(0, 0, 0);
+      scene.parent?.updateWorldMatrix(true, false);
       scene.updateMatrixWorld(true);
 
       const box = new THREE.Box3().setFromObject(scene);
-      const center = new THREE.Vector3();
-      box.getCenter(center);
+      const center = box.getCenter(new THREE.Vector3());
+      if (scene.parent) scene.parent.worldToLocal(center);
 
       scene.position.set(-center.x, -center.y, -center.z);
       scene.updateMatrixWorld(true);
@@ -303,6 +286,8 @@ export default function TshirtModel({
     }
     const loader = new THREE.TextureLoader();
     const tex = loader.load("/logos/trimmed_yeulumin ai-05.png", (loaded) => {
+      loaded.colorSpace = THREE.SRGBColorSpace;
+      loaded.anisotropy = 8;
       loaded.needsUpdate = true;
       setLogoTexture(loaded);
     });
@@ -320,6 +305,8 @@ export default function TshirtModel({
     }
     const loader = new THREE.TextureLoader();
     const tex = loader.load(customTextureUrl, (loaded) => {
+      loaded.colorSpace = THREE.SRGBColorSpace;
+      loaded.anisotropy = 8;
       loaded.needsUpdate = true;
       setCustomTexture(loaded);
     });
@@ -327,6 +314,141 @@ export default function TshirtModel({
       tex.dispose();
     };
   }, [design, customTextureUrl]);
+
+  // ── Print decal for multi-mesh garments (hoodie / oversized) ──
+  // These GLBs are split across several meshes with nested transforms, so we project the
+  // decal in world space onto every fabric mesh it touches and parent the result to that mesh.
+  const activeTexture = customTexture || logoTexture || canvasTexture;
+
+  useEffect(() => {
+    if (!useSceneRenderer || !scene || !activeTexture) return;
+
+    scene.updateWorldMatrix(true, true);
+
+    const isChainVisible = (obj: THREE.Object3D | null): boolean => {
+      for (let o = obj; o; o = o.parent) if (!o.visible) return false;
+      return true;
+    };
+
+    const fabric: THREE.Mesh[] = [];
+    scene.traverse((child: any) => {
+      if (child.isMesh && !child.userData?.isDecal && isChainVisible(child)) fabric.push(child);
+    });
+    if (fabric.length === 0) return;
+
+    const box = new THREE.Box3();
+    fabric.forEach((m) => box.expandByObject(m));
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+
+    // Placement params are tuned on the classic tee (≈0.55 wide, 0.61 tall); map them proportionally
+    const REF_W = 0.55;
+    const REF_H = 0.61;
+    const isBackSide = decalTarget === "back";
+    const chestAnchor = isHoodie ? 0.1 : 0.13; // chest height above garment center (fraction of height)
+    const widthFactor = isHoodie ? 0.9 : 1.0;
+
+    const x = center.x + (decalPosX / REF_W) * size.x * (isBackSide ? -1 : 1);
+    const y = center.y + chestAnchor * size.y + ((decalPosY - 0.05) / REF_H) * size.y;
+    const printSize = (decalScale / REF_W) * size.x * widthFactor;
+
+    // Find the actual fabric surface at (x, y) on the chosen side
+    const dirZ = isBackSide ? 1 : -1;
+    const origin = new THREE.Vector3(x, y, isBackSide ? box.min.z - 1 : box.max.z + 1);
+    const raycaster = new THREE.Raycaster(origin, new THREE.Vector3(0, 0, dirZ));
+    const hit = raycaster.intersectObjects(fabric, false)[0];
+    const projectorPos = hit ? hit.point.clone() : new THREE.Vector3(x, y, isBackSide ? box.min.z : box.max.z);
+
+    const orientation = new THREE.Euler(0, isBackSide ? Math.PI : 0, 0);
+    const depth = size.z * 0.5; // deep enough to wrap the surface, shallow enough to miss the other side
+    const projectorSize = new THREE.Vector3(printSize, printSize, depth);
+    const projectorBox = new THREE.Box3().setFromCenterAndSize(projectorPos, projectorSize);
+
+    // Unlit + no tone mapping: the print keeps its true colors instead of being washed out
+    const material = new THREE.MeshBasicMaterial({
+      map: activeTexture,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      toneMapped: false,
+    });
+
+    const created: THREE.Mesh[] = [];
+    const meshBox = new THREE.Box3();
+    fabric.forEach((m) => {
+      meshBox.setFromObject(m);
+      if (!meshBox.intersectsBox(projectorBox)) return;
+      const geom = new DecalGeometry(m, projectorPos, orientation, projectorSize);
+      if (!geom.attributes.position || geom.attributes.position.count === 0) {
+        geom.dispose();
+        return;
+      }
+      // DecalGeometry outputs world-space vertices; convert to the mesh's local space so it follows the mesh
+      geom.applyMatrix4(m.matrixWorld.clone().invert());
+      const decalMesh = new THREE.Mesh(geom, material);
+      decalMesh.userData.isDecal = true;
+      decalMesh.renderOrder = 1;
+      m.add(decalMesh);
+      created.push(decalMesh);
+    });
+
+    return () => {
+      created.forEach((d) => {
+        d.parent?.remove(d);
+        d.geometry.dispose();
+      });
+      material.dispose();
+    };
+  }, [useSceneRenderer, scene, activeTexture, decalPosX, decalPosY, decalScale, decalTarget, isHoodie, responsiveScale]);
+
+  // ── Product shots for the cart: render the real garment straight-on from the front and back ──
+  useEffect(() => {
+    return registerGarmentCapturer((size = 512) => {
+      const group = garmentGroupRef.current;
+      const canvas = gl.domElement;
+      if (!group || !canvas.width || !canvas.height) return null;
+
+      group.updateWorldMatrix(true, true);
+      const box = new THREE.Box3().setFromObject(group);
+      if (box.isEmpty()) return null;
+      const center = box.getCenter(new THREE.Vector3());
+      const dims = box.getSize(new THREE.Vector3());
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const side = Math.min(w, h); // square crop from the middle of the canvas
+      const shotCam = (camera as THREE.PerspectiveCamera).clone();
+      shotCam.aspect = w / h;
+      shotCam.updateProjectionMatrix();
+
+      // Distance so the garment (+12% margin) fills the square crop
+      const halfFov = THREE.MathUtils.degToRad(shotCam.fov) / 2;
+      const need = Math.max(dims.x, dims.y) * 1.12;
+      const distance = need / (2 * Math.tan(halfFov) * (side / h)) + dims.z / 2;
+
+      const shoot = (sign: 1 | -1) => {
+        shotCam.position.set(center.x, center.y, center.z + sign * distance);
+        shotCam.lookAt(center);
+        gl.render(rootScene, shotCam);
+
+        const out = document.createElement("canvas");
+        out.width = size;
+        out.height = size;
+        const ctx = out.getContext("2d");
+        if (!ctx) return "";
+        ctx.fillStyle = "#F5F6F8";
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(canvas, (w - side) / 2, (h - side) / 2, side, side, 0, 0, size, size);
+        return out.toDataURL("image/jpeg", 0.88);
+      };
+
+      const front = shoot(1);
+      const back = shoot(-1);
+      gl.render(rootScene, camera); // restore the user's view in the same frame (no flicker)
+      return front && back ? { front, back } : null;
+    });
+  }, [gl, rootScene, camera]);
 
   const [autoRotate, setAutoRotate] = useState(true);
   const autoRotateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -405,59 +527,24 @@ export default function TshirtModel({
     }
   });
 
+  // Projection depth for the classic tee (~0.27 units thick): shallow enough that a front
+  // print never bleeds through onto the back collar/sides, deep enough to wrap the chest curve.
+  const TEE_DECAL_DEPTH = 0.1;
   const isBack = decalTarget === "back";
   const decalZ = isBack ? -0.125 : 0.125;
   const decalRotY = isBack ? Math.PI : 0;
   const adjustedPosX = isBack ? -decalPosX : decalPosX;
 
-  const isEcoHoodie = isHoodie && nodes.hoodie_Sweat_Rib_1X1_319gsm_hoodie_0;
-  const hoodieDecalPos: [number, number, number] = isEcoHoodie
-    ? [adjustedPosX, decalPosY + 0.05, isBack ? -0.14 : 0.14]
-    : [isBack ? -decalPosX * 1000 : decalPosX * 1000, (decalPosY * 1000) + 60, isBack ? -1050 : -925];
-  const hoodieDecalScale: [number, number, number] = isEcoHoodie
-    ? [decalScale, decalScale, decalScale]
-    : [decalScale * 1000, decalScale * 1000, decalScale * 1000];
-
   return (
     <>
       {useSceneRenderer ? (
         <>
-          <group position={[0, -0.55, 0]} scale={[responsiveScale, responsiveScale, responsiveScale]}>
+          <group ref={garmentGroupRef} position={[0, -0.55, 0]} scale={[responsiveScale, responsiveScale, responsiveScale]}>
             <primitive object={scene} />
           </group>
-          {isHoodie && hoodieMeshRef.current && canvasTexture && (
-            <Decal
-              mesh={hoodieMeshRef as any}
-              position={hoodieDecalPos}
-              rotation={[0, decalRotY, 0]}
-              scale={hoodieDecalScale}
-              map={canvasTexture}
-              polygonOffsetFactor={-1}
-            />
-          )}
-          {isHoodie && hoodieMeshRef.current && logoTexture && (
-            <Decal
-              mesh={hoodieMeshRef as any}
-              position={hoodieDecalPos}
-              rotation={[0, decalRotY, 0]}
-              scale={hoodieDecalScale}
-              map={logoTexture}
-              polygonOffsetFactor={-1}
-            />
-          )}
-          {isHoodie && hoodieMeshRef.current && customTexture && (
-            <Decal
-              mesh={hoodieMeshRef as any}
-              position={hoodieDecalPos}
-              rotation={[0, decalRotY, 0]}
-              scale={hoodieDecalScale}
-              map={customTexture}
-              polygonOffsetFactor={-1}
-            />
-          )}
         </>
       ) : (
-        <group position={[0, -0.55, 0]} scale={[responsiveScale, responsiveScale, responsiveScale]}>
+        <group ref={garmentGroupRef} position={[0, -0.55, 0]} scale={[responsiveScale, responsiveScale, responsiveScale]}>
           <mesh
             ref={meshRef}
             geometry={shirtMeshNode.geometry}
@@ -468,9 +555,10 @@ export default function TshirtModel({
                 mesh={meshRef as any}
                 position={[adjustedPosX, decalPosY, decalZ]}
                 rotation={[0, decalRotY, 0]}
-                scale={[decalScale, decalScale, decalScale]}
+                scale={[decalScale, decalScale, TEE_DECAL_DEPTH]}
                 map={canvasTexture}
                 polygonOffsetFactor={-1}
+                material-toneMapped={false}
               />
             )}
             {logoTexture && (
@@ -478,9 +566,10 @@ export default function TshirtModel({
                 mesh={meshRef as any}
                 position={[adjustedPosX, decalPosY, decalZ]}
                 rotation={[0, decalRotY, 0]}
-                scale={[decalScale, decalScale, decalScale]}
+                scale={[decalScale, decalScale, TEE_DECAL_DEPTH]}
                 map={logoTexture}
                 polygonOffsetFactor={-1}
+                material-toneMapped={false}
               />
             )}
             {customTexture && (
@@ -488,9 +577,10 @@ export default function TshirtModel({
                 mesh={meshRef as any}
                 position={[adjustedPosX, decalPosY, decalZ]}
                 rotation={[0, decalRotY, 0]}
-                scale={[decalScale, decalScale, decalScale]}
+                scale={[decalScale, decalScale, TEE_DECAL_DEPTH]}
                 map={customTexture}
                 polygonOffsetFactor={-1}
+                material-toneMapped={false}
               />
             )}
           </mesh>

@@ -2,17 +2,27 @@
 
 import React, { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
-import { Environment, Html, Loader } from "@react-three/drei";
+import { Environment, Html, useProgress } from "@react-three/drei";
 import TshirtModel from "./TshirtModel";
 
 function ViewerFallback() {
+  // Poll loader progress instead of subscribing: useProgress updates fire during other
+  // components' renders, which triggers React "setState while rendering" warnings.
+  const [pct, setPct] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setPct(Math.round(useProgress.getState().progress)), 200);
+    return () => clearInterval(id);
+  }, []);
   return (
     <Html center>
-      <div className="flex flex-col items-center justify-center min-w-[200px]">
-        <div className="h-6 w-6 border-2 border-[#00FFB2] border-t-transparent rounded-full animate-spin mb-3" />
+      <div className="flex flex-col items-center justify-center min-w-[220px]">
+        <div className="h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3" />
         <span className="text-[10px] font-mono text-[#666] tracking-[2px] uppercase">
-          Synthesizing 3D...
+          Loading garment {pct > 0 ? `${pct}%` : "..."}
         </span>
+        <div className="mt-2 h-1 w-40 rounded-full bg-neutral-200 overflow-hidden">
+          <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${pct}%` }} />
+        </div>
       </div>
     </Html>
   );

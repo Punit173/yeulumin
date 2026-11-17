@@ -7,15 +7,14 @@ import { ArrowLeft, Search, MoreVertical, ShoppingBag, Heart, Sparkles, X, Home 
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import GrainOverlay from "../components/GrainOverlay";
-import { PRODUCTS, CATEGORIES, Product, fetchDriveProducts } from "../lib/products";
+import { PRODUCTS, CATEGORIES, Product, fetchDriveProducts, thumbnailUrl } from "../lib/products";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
-import { useCartStore } from "../store/cartStore";
+import { useAddProductToCart } from "../components/SizePickerModal";
 
 export default function ProductsPage() {
-  const { user } = useAuth();
   const router = useRouter();
-  const addItem = useCartStore((state) => state.addItem);
+  // Catalog designs can only be bought (not customized): add-to-cart asks for a size first
+  const { requestAdd, sizePicker, addedId } = useAddProductToCart("/products");
 
   // States
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
@@ -23,7 +22,6 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [cartSuccessId, setCartSuccessId] = useState<string | null>(null);
   const [wishlistedIds, setWishlistedIds] = useState<string[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,33 +89,6 @@ export default function ProductsPage() {
     setActiveMenuId(null);
   };
 
-  const handleAddToCart = (product: Product, e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    if (!user) {
-      router.push(`/auth?redirect=/products`);
-      return;
-    }
-
-    addItem({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      quantity: 1,
-      size: "M",
-      color: product.defaultColor || "#ffffff",
-      image: product.image,
-      style: product.printPosition || "front",
-    });
-
-    setCartSuccessId(product.id);
-    setActiveMenuId(null);
-    setTimeout(() => setCartSuccessId(null), 2500);
-  };
 
   // Filter and sort products
   const processedProducts = useMemo(() => {
@@ -148,6 +119,7 @@ export default function ProductsPage() {
   return (
     <div className="relative min-h-screen flex flex-col bg-[#F5F6F8] text-[#0A0A0A] overflow-hidden antialiased">
       <GrainOverlay />
+      {sizePicker}
       
       {/* Desktop Header Navbar */}
       <Navbar />
@@ -235,7 +207,6 @@ export default function ProductsPage() {
             {processedProducts.map((product) => {
               const isWishlisted = wishlistedIds.includes(product.id);
               const isMenuOpen = activeMenuId === product.id;
-              const remixUrl = `/customize?preset=${encodeURIComponent(product.id)}&texture=${encodeURIComponent(product.image)}&name=${encodeURIComponent(product.name)}`;
 
               return (
                 <div
@@ -244,20 +215,25 @@ export default function ProductsPage() {
                 >
                   <div className="relative">
                     {/* Visual Card Image */}
-                    <Link
-                      href={remixUrl}
-                      className="aspect-square w-full bg-[#F9FAFB] overflow-hidden flex items-center justify-center p-2 sm:p-6 block relative"
+                    <button
+                      type="button"
+                      onClick={(e) => requestAdd(product, e)}
+                      title={`Add ${product.name} to cart`}
+                      className="aspect-square w-full bg-[#F9FAFB] overflow-hidden block relative cursor-pointer"
                     >
+                      {/* Fills the card edge to edge; the slight zoom trims thin border lines baked into some photos */}
                       <img
-                        src={product.image}
+                        src={thumbnailUrl(product.image)}
                         alt={product.name}
+                        loading="lazy"
+                        decoding="async"
                         referrerPolicy="no-referrer"
-                        className="max-h-full max-w-full object-contain transition-transform duration-500 group-hover:scale-103"
+                        className="absolute inset-0 h-full w-full object-cover scale-[1.03] transition-transform duration-500 group-hover:scale-[1.07]"
                       />
-                    </Link>
+                    </button>
 
                     {/* Direct success prompt */}
-                    {cartSuccessId === product.id && (
+                    {addedId === product.id && (
                       <div className="absolute inset-0 bg-black/80 flex items-center justify-center text-white text-[9px] sm:text-xs font-bold font-mono tracking-widest rounded-t-xl sm:rounded-t-2xl z-10 text-center px-1">
                         ADDED!
                       </div>
@@ -299,7 +275,10 @@ export default function ProductsPage() {
                           
                           <div className="absolute right-0 bottom-8 w-32 sm:w-44 rounded-xl bg-white border border-neutral-200/80 p-1.5 shadow-xl z-40 flex flex-col gap-0.5 animate-fadeIn">
                             <button
-                              onClick={() => handleAddToCart(product)}
+                              onClick={(e) => {
+                                setActiveMenuId(null);
+                                requestAdd(product, e);
+                              }}
                               className="px-2 py-1.5 sm:px-3 sm:py-2 text-[9px] sm:text-[11px] font-semibold text-neutral-700 hover:bg-neutral-50 hover:text-black rounded-lg text-left flex items-center gap-1.5 sm:gap-2 cursor-pointer w-full"
                             >
                               <ShoppingBag className="h-3 w-3 sm:h-3.5 sm:w-3.5" />

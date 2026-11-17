@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Truck, ShieldCheck } from "lucide-react";
+import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Truck, ShieldCheck, PencilLine } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import GrainOverlay from "../components/GrainOverlay";
@@ -143,8 +143,20 @@ export default function CartPage() {
                       ₹{item.price * item.quantity}
                     </div>
 
-                    {/* Quantity Selector & Delete button */}
+                    {/* Quantity Selector, Edit & Delete buttons */}
                     <div className="flex items-center gap-3">
+
+                      {/* Reopen this design in the Design Lab */}
+                      {item.designId && (
+                        <Link
+                          href={`/customize?edit=${encodeURIComponent(item.id)}`}
+                          className="px-2.5 py-2 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
+                          title="Edit this design"
+                        >
+                          <PencilLine className="h-3.5 w-3.5" />
+                          <span>Edit design</span>
+                        </Link>
+                      )}
                       
                       {/* Quantity Stepper */}
                       <div className="flex items-center bg-neutral-50 border border-neutral-200 rounded-lg">
